@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tauri + React + Typescript</title>
+    <style>
+      /* 禁用文本选择，让应用看起来更像原生应用 */
+      * {
+        user-select: none;
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+      }
+      
+      /* 允许输入框中的文本选择 */
+      input, textarea {
+        user-select: text;
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+      }
+    </style>
+    <script>
+      // 禁用右键菜单
+      document.addEventListener('contextmenu', event => event.preventDefault());
+      
+      // 禁用常见的浏览器快捷键
+      document.addEventListener('keydown', event => {
+        // 禁用 F12（开发者工具）
+        if (event.key === 'F12') {
+          event.preventDefault();
+          return false;
+        }
+        
+        // 禁用 Ctrl+Shift+I（开发者工具）
+        if (event.ctrlKey && event.shiftKey && event.key === 'I') {
+          event.preventDefault();
+          return false;
+        }
+        
+        // 禁用 Ctrl+Shift+J（控制台）
+        if (event.ctrlKey && event.shiftKey && event.key === 'J') {
+          event.preventDefault();
+          return false;
+        }
+        
+        // 禁用 Ctrl+Shift+C（元素选择器）
+        if (event.ctrlKey && event.shiftKey && event.key === 'C') {
+          event.preventDefault();
+          return false;
+        }
+        
+        // 禁用 Ctrl+U（查看源代码）
+        if (event.ctrlKey && event.key === 'u') {
+          event.preventDefault();
+          return false;
+        }
+        
+        // 禁用 Ctrl+S（保存页面）
+        if (event.ctrlKey && event.key === 's') {
+          event.preventDefault();
+          return false;
+        }
+        
+        // 禁用 Ctrl+P（打印）
+        if (event.ctrlKey && event.key === 'p') {
+          event.preventDefault();
+          return false;
+        }
+        
+        // 禁用 F5 和 Ctrl+R（刷新页面） - 可选，根据需求决定
+        // if (event.key === 'F5' || (event.ctrlKey && event.key === 'r')) {
+        //   event.preventDefault();
+        //   return false;
+        // }
+      });
+      
+      // 禁用拖拽文件到窗口
+      document.addEventListener('dragover', event => event.preventDefault());
+      document.addEventListener('drop', event => event.preventDefault());
+    </script>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
