@@ -17,6 +17,7 @@
         "height": 750,
         "resizable": false,
         "maximizable": false,
+        "center": true,
         "devtools": true
       }
     ],
