@@ -101,7 +101,7 @@ function App() {
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
   // 磁盘信息状态
-  const [diskInfo, setDiskInfo] = useState<DiskInfo | null>(null);
+  const [, setDiskInfo] = useState<DiskInfo | null>(null);
 
   // 获取系统信息（CPU + 内存）
   const fetchSystemInfo = async () => {

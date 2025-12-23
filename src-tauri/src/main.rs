@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    display_cpu_lib::run()
+    sigil_lib::run()
 }

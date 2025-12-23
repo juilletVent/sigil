@@ -19,18 +19,18 @@ use windows::Win32::UI::WindowsAndMessaging::GetSystemMenu;
 /// 系统信息（CPU + 内存）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemInfo {
-    pub cpu_usage: f32,       // CPU 占用百分比
-    pub memory_used: u64,     // 内存使用量（字节）
-    pub memory_total: u64,    // 内存总量（字节）
-    pub memory_percent: f32,  // 内存占用百分比
+    pub cpu_usage: f32,      // CPU 占用百分比
+    pub memory_used: u64,    // 内存使用量（字节）
+    pub memory_total: u64,   // 内存总量（字节）
+    pub memory_percent: f32, // 内存占用百分比
 }
 
 /// 磁盘信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskInfo {
-    pub disk_used: u64,       // 磁盘使用量（字节）
-    pub disk_total: u64,      // 磁盘总量（字节）
-    pub disk_percent: f32,    // 磁盘占用百分比
+    pub disk_used: u64,    // 磁盘使用量（字节）
+    pub disk_total: u64,   // 磁盘总量（字节）
+    pub disk_percent: f32, // 磁盘占用百分比
 }
 
 // ==================== 监控状态管理 ====================
@@ -205,14 +205,6 @@ fn start_low_frequency_monitor(app: AppHandle) {
 
 // ==================== 工具函数 ====================
 
-/// 从文件加载图标
-fn load_icon_from_file(path: &str) -> Result<tauri::image::Image<'static>, String> {
-    let img = image::open(path).map_err(|e| format!("打开图标失败: {}", e))?;
-    let (width, height) = img.dimensions();
-    let rgba = img.to_rgba8().into_raw();
-    Ok(tauri::image::Image::new_owned(rgba, width, height))
-}
-
 /// 禁用窗口系统菜单（Windows平台）
 #[cfg(target_os = "windows")]
 fn disable_system_menu(window: &tauri::WebviewWindow) {
@@ -260,14 +252,18 @@ pub fn run() {
 
             // 初始化托盘图标
             let window_for_tray = window.clone();
-            let icon = load_icon_from_file("icons/128x128.png")
-                .or_else(|_| load_icon_from_file("icons/icon.png"))
-                .or_else(|_| load_icon_from_file("../icons/128x128.png"))
-                .map_err(|e| format!("无法加载图标: {}", e))?;
-            
+
+            // 使用编译时嵌入的图标（确保在打包后也能正确加载）
+            let icon = include_bytes!("../icons/128x128.png");
+            let icon_image =
+                image::load_from_memory(icon).map_err(|e| format!("加载图标失败: {}", e))?;
+            let (width, height) = icon_image.dimensions();
+            let rgba = icon_image.to_rgba8().into_raw();
+            let tray_icon = tauri::image::Image::new_owned(rgba, width, height);
+
             let _tray = TrayIconBuilder::with_id("main-tray")
-                .icon(icon)
-                .tooltip("Display CPU - 系统监控")
+                .icon(tray_icon)
+                .tooltip("Sigil")
                 .menu(&menu)
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| {
