@@ -4,6 +4,7 @@ import {
   CloseOutlined,
   QuestionCircleOutlined,
 } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import { FormContainer, ButtonGroup } from "./styles";
 
 export interface CommandFormValues {
@@ -22,6 +23,7 @@ interface CommandFormProps {
 }
 
 function CommandForm({ initialValues, onSubmit, onCancel }: CommandFormProps) {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
 
   const handleFinish = (values: CommandFormValues) => {
@@ -37,32 +39,32 @@ function CommandForm({ initialValues, onSubmit, onCancel }: CommandFormProps) {
         initialValues={initialValues}
       >
         <Form.Item
-          label="名称"
+          label={t("components.commandForm.name")}
           name="name"
-          rules={[{ required: true, message: "请输入命令名称" }]}
+          rules={[{ required: true, message: t("components.commandForm.nameRequired") }]}
         >
-          <Input placeholder="输入命令名称" />
+          <Input placeholder={t("components.commandForm.namePlaceholder")} />
         </Form.Item>
 
         <Form.Item
           label={
             <span>
-              命令 &nbsp;
-              <Tooltip title="要执行的命令">
+              {t("components.commandForm.command")} &nbsp;
+              <Tooltip title={t("components.commandForm.commandTooltip")}>
                 <QuestionCircleOutlined style={{ color: "#8c8c8c" }} />
               </Tooltip>
             </span>
           }
           name="command"
-          rules={[{ required: true, message: "请输入命令" }]}
+          rules={[{ required: true, message: t("components.commandForm.commandRequired") }]}
         >
-          <Input placeholder="输入要执行的命令" />
+          <Input placeholder={t("components.commandForm.commandPlaceholder")} />
         </Form.Item>
 
         <Form.Item name="sudo" valuePropName="checked">
           <Checkbox>
-            Sudo &nbsp;
-            <Tooltip title="以管理员权限运行">
+            {t("components.commandForm.sudo")} &nbsp;
+            <Tooltip title={t("components.commandForm.sudoTooltip")}>
               <QuestionCircleOutlined style={{ color: "#8c8c8c" }} />
             </Tooltip>
           </Checkbox>
@@ -71,35 +73,35 @@ function CommandForm({ initialValues, onSubmit, onCancel }: CommandFormProps) {
         <Form.Item
           label={
             <span>
-              工作目录 &nbsp;
-              <Tooltip title="命令执行的工作目录">
+              {t("components.commandForm.workingDirectory")} &nbsp;
+              <Tooltip title={t("components.commandForm.workingDirectoryTooltip")}>
                 <QuestionCircleOutlined style={{ color: "#8c8c8c" }} />
               </Tooltip>
             </span>
           }
           name="workingDirectory"
         >
-          <Input placeholder="选择工作目录" />
+          <Input placeholder={t("components.commandForm.workingDirectoryPlaceholder")} />
         </Form.Item>
 
         <Form.Item
           label={
             <span>
-              关联地址 &nbsp;
-              <Tooltip title="相关的URL地址，可以快速打开">
+              {t("components.commandForm.url")} &nbsp;
+              <Tooltip title={t("components.commandForm.urlTooltip")}>
                 <QuestionCircleOutlined style={{ color: "#8c8c8c" }} />
               </Tooltip>
             </span>
           }
           name="url"
         >
-          <Input placeholder="输入URL" />
+          <Input placeholder={t("components.commandForm.urlPlaceholder")} />
         </Form.Item>
 
         <Form.Item name="notificationWhenFinished" valuePropName="checked">
           <Checkbox>
-            执行完成通知 &nbsp;
-            <Tooltip title="命令执行完成后发送通知">
+            {t("components.commandForm.notificationWhenFinished")} &nbsp;
+            <Tooltip title={t("components.commandForm.notificationWhenFinishedTooltip")}>
               <QuestionCircleOutlined style={{ color: "#8c8c8c" }} />
             </Tooltip>
           </Checkbox>
@@ -108,11 +110,11 @@ function CommandForm({ initialValues, onSubmit, onCancel }: CommandFormProps) {
         <ButtonGroup>
           <Button type="primary" htmlType="submit">
             <CheckOutlined />
-            确定
+            {t("common.confirm")}
           </Button>
           <Button onClick={onCancel}>
             <CloseOutlined />
-            取消
+            {t("common.cancel")}
           </Button>
         </ButtonGroup>
       </Form>

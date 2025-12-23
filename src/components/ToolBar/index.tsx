@@ -6,6 +6,7 @@ import {
   InfoCircleOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import { AppRoutes } from "../../constants/routes";
 import { ToolBarContainer, LeftActions, RightActions } from "./styles";
 
@@ -16,6 +17,7 @@ interface ToolBarProps {
 }
 
 function ToolBar({ onAddCommand, onSort, onSettings }: ToolBarProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const handleInfo = () => {
@@ -29,7 +31,7 @@ function ToolBar({ onAddCommand, onSort, onSettings }: ToolBarProps) {
           type="text"
           icon={<PlusOutlined />}
           onClick={onAddCommand}
-          title="添加命令"
+          title={t("components.toolbar.addCommand")}
         />
       </LeftActions>
       <RightActions>
@@ -37,19 +39,19 @@ function ToolBar({ onAddCommand, onSort, onSettings }: ToolBarProps) {
           type="text"
           icon={<UnorderedListOutlined />}
           onClick={onSort}
-          title="排序"
+          title={t("components.toolbar.sort")}
         />
         <Button
           type="text"
           icon={<SettingOutlined />}
           onClick={onSettings}
-          title="设置"
+          title={t("components.toolbar.settings")}
         />
         <Button
           type="text"
           icon={<InfoCircleOutlined />}
           onClick={handleInfo}
-          title="信息"
+          title={t("components.toolbar.info")}
         />
       </RightActions>
     </ToolBarContainer>

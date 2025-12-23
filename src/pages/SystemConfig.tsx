@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { Checkbox } from "antd";
+import { Checkbox, Radio } from "antd";
 import styled from "styled-components";
+import { useTranslation } from "react-i18next";
 import SecondaryNavBar from "../components/SecondaryNavBar";
 
 // ==================== 样式组件 ====================
@@ -45,9 +46,22 @@ const SettingItem = styled.div`
   padding: 16px 0;
 `;
 
+const SettingLabel = styled.div`
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: #333;
+
+  @media (prefers-color-scheme: dark) {
+    color: #ddd;
+  }
+`;
+
 // ==================== 主组件 ====================
 
 function SystemConfig() {
+  const { t, i18n } = useTranslation();
+  
   // 从 localStorage 读取初始值
   const [autoStart, setAutoStart] = useState<boolean>(() => {
     const saved = localStorage.getItem("autoStart");
@@ -62,19 +76,37 @@ function SystemConfig() {
     // TODO: 后续可以对接 Tauri API 来实现真正的开机自启动功能
   };
 
+  // 处理语言切换
+  const handleLanguageChange = (language: string) => {
+    i18n.changeLanguage(language);
+    console.log("语言已切换为:", language);
+    // TODO: 后续可以将语言设置持久化到localStorage
+  };
+
   return (
     <PageContainer>
       <SecondaryNavBar />
       <ContentWrapper>
-        <PageTitle>系统设置</PageTitle>
+        <PageTitle>{t("pages.systemConfig.title")}</PageTitle>
         <SettingsContent>
           <SettingItem>
             <Checkbox
               checked={autoStart}
               onChange={(e) => handleAutoStartChange(e.target.checked)}
             >
-              开机自启动
+              {t("pages.systemConfig.autoStart")}
             </Checkbox>
+          </SettingItem>
+          
+          <SettingItem>
+            <SettingLabel>{t("pages.systemConfig.language")}</SettingLabel>
+            <Radio.Group 
+              value={i18n.language} 
+              onChange={(e) => handleLanguageChange(e.target.value)}
+            >
+              <Radio value="zh-CN">{t("pages.systemConfig.languageZhCN")}</Radio>
+              <Radio value="en-US">{t("pages.systemConfig.languageEnUS")}</Radio>
+            </Radio.Group>
           </SettingItem>
         </SettingsContent>
       </ContentWrapper>

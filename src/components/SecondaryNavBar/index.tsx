@@ -1,6 +1,7 @@
 import { Button } from "antd";
 import { LeftOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router";
+import { useTranslation } from "react-i18next";
 import { AppRoutes } from "../../constants/routes";
 import { NavBarContainer, BackButton } from "./styles";
 
@@ -9,6 +10,7 @@ import { NavBarContainer, BackButton } from "./styles";
  * 提供返回到首页的功能
  */
 function SecondaryNavBar() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const handleBack = () => {
@@ -22,9 +24,9 @@ function SecondaryNavBar() {
           type="text"
           icon={<LeftOutlined />}
           onClick={handleBack}
-          title="返回"
+          title={t("common.back")}
         >
-          返回
+          {t("common.back")}
         </Button>
       </BackButton>
     </NavBarContainer>

@@ -1,0 +1,75 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "reset": "Reset",
+    "back": "Back",
+    "version": "Version"
+  },
+  "pages": {
+    "home": {
+      "title": "Home"
+    },
+    "about": {
+      "title": "Sigil",
+      "version": "Version 0.1.0",
+      "aboutProgram": "About This Program",
+      "description": "Sigil is a modern desktop application built on Tauri, designed to simplify the management and execution of command-line tools.",
+      "techStack": "Tech Stack",
+      "projectInfo": "Project Information",
+      "projectName": "Project Name:",
+      "projectVersion": "Version:",
+      "license": "License:",
+      "projectNameValue": "Sigil",
+      "projectVersionValue": "0.1.0",
+      "licenseValue": "MIT"
+    },
+    "configEdit": {
+      "titleEdit": "Edit Configuration",
+      "titleAdd": "Add Configuration"
+    },
+    "systemConfig": {
+      "title": "System Settings",
+      "autoStart": "Start on system startup",
+      "language": "Language",
+      "languageZhCN": "简体中文",
+      "languageEnUS": "English"
+    }
+  },
+  "components": {
+    "commandForm": {
+      "name": "Name",
+      "nameRequired": "Please enter command name",
+      "namePlaceholder": "Enter command name",
+      "command": "Command",
+      "commandTooltip": "Command to execute",
+      "commandRequired": "Please enter command",
+      "commandPlaceholder": "Enter command to execute",
+      "sudo": "Sudo",
+      "sudoTooltip": "Run with administrator privileges",
+      "workingDirectory": "Working Directory",
+      "workingDirectoryTooltip": "Working directory for command execution",
+      "workingDirectoryPlaceholder": "Select working directory",
+      "url": "Associated URL",
+      "urlTooltip": "Related URL address, can be quickly opened",
+      "urlPlaceholder": "Enter URL",
+      "notificationWhenFinished": "Notification When Finished",
+      "notificationWhenFinishedTooltip": "Send notification when command execution completes"
+    },
+    "toolbar": {
+      "addCommand": "Add Command",
+      "sort": "Sort",
+      "settings": "Settings",
+      "info": "Info"
+    },
+    "statusBar": {
+      "cpu": "CPU:",
+      "memory": "MEM:"
+    },
+    "commandItem": {
+      "run": "Run Command",
+      "status": "Status"
+    }
+  }
+}

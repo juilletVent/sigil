@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import styled from "styled-components";
+import { useTranslation } from "react-i18next";
 
 // ==================== 类型定义 ====================
 
@@ -101,6 +102,8 @@ const bytesToGB = (bytes: number): string => {
 // ==================== 主组件 ====================
 
 function StatusBar() {
+  const { t } = useTranslation();
+  
   // 系统信息状态（CPU + 内存）
   const [systemInfo, setSystemInfo] = useState<SystemInfo | null>(null);
 
@@ -159,7 +162,7 @@ function StatusBar() {
     <Container>
       {/* CPU 监控 */}
       <MonitorCard>
-        <CardTitle>CPU:</CardTitle>
+        <CardTitle>{t("components.statusBar.cpu")}</CardTitle>
         {systemInfo !== null ? (
           <ValueDisplay $percent={systemInfo.cpu_usage}>
             {systemInfo.cpu_usage.toFixed(1)}%
@@ -173,7 +176,7 @@ function StatusBar() {
 
       {/* 内存监控 */}
       <MonitorCard>
-        <CardTitle>MEM:</CardTitle>
+        <CardTitle>{t("components.statusBar.memory")}</CardTitle>
         {systemInfo !== null ? (
           <>
             <ValueDisplay $percent={systemInfo.memory_percent}>

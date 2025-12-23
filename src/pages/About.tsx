@@ -1,4 +1,5 @@
 import styled from "styled-components";
+import { useTranslation } from "react-i18next";
 import SecondaryNavBar from "../components/SecondaryNavBar";
 import TechLogos from "../components/TechLogos";
 
@@ -99,39 +100,40 @@ const InfoValue = styled.span`
 // ==================== 主组件 ====================
 
 function About() {
+  const { t } = useTranslation();
+  
   return (
     <AboutContainer>
       <SecondaryNavBar />
       <ContentWrapper>
-        <Title>Sigil</Title>
-        <Version>版本 0.1.0</Version>
+        <Title>{t("pages.about.title")}</Title>
+        <Version>{t("pages.about.version")}</Version>
 
         <Section>
-          <SectionTitle>关于本程序</SectionTitle>
+          <SectionTitle>{t("pages.about.aboutProgram")}</SectionTitle>
           <Description>
-            Sigil 是一个基于 Tauri
-            构建的现代化桌面应用程序，旨在简化命令行工具的管理和执行过程。
+            {t("pages.about.description")}
           </Description>
         </Section>
 
         <Section>
-          <SectionTitle>技术栈</SectionTitle>
+          <SectionTitle>{t("pages.about.techStack")}</SectionTitle>
           <TechLogos />
         </Section>
 
         <Section>
-          <SectionTitle>项目信息</SectionTitle>
+          <SectionTitle>{t("pages.about.projectInfo")}</SectionTitle>
           <InfoItem>
-            <InfoLabel>项目名称:</InfoLabel>
-            <InfoValue>Sigil</InfoValue>
+            <InfoLabel>{t("pages.about.projectName")}</InfoLabel>
+            <InfoValue>{t("pages.about.projectNameValue")}</InfoValue>
           </InfoItem>
           <InfoItem>
-            <InfoLabel>版本:</InfoLabel>
-            <InfoValue>0.1.0</InfoValue>
+            <InfoLabel>{t("pages.about.projectVersion")}</InfoLabel>
+            <InfoValue>{t("pages.about.projectVersionValue")}</InfoValue>
           </InfoItem>
           <InfoItem>
-            <InfoLabel>许可证:</InfoLabel>
-            <InfoValue>MIT</InfoValue>
+            <InfoLabel>{t("pages.about.license")}</InfoLabel>
+            <InfoValue>{t("pages.about.licenseValue")}</InfoValue>
           </InfoItem>
         </Section>
       </ContentWrapper>

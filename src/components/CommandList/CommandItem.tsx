@@ -1,4 +1,5 @@
 import { PlayCircleOutlined, FileOutlined } from "@ant-design/icons";
+import { useTranslation } from "react-i18next";
 import {
   CommandItemContainer,
   PlayButton,
@@ -19,6 +20,8 @@ interface CommandItemProps {
 }
 
 function CommandItem({ command, onPlay, onEdit }: CommandItemProps) {
+  const { t } = useTranslation();
+  
   const handlePlay = (e: React.MouseEvent) => {
     e.stopPropagation();
     onPlay?.(command.id);
@@ -30,10 +33,10 @@ function CommandItem({ command, onPlay, onEdit }: CommandItemProps) {
 
   return (
     <CommandItemContainer onClick={handleItemClick}>
-      <PlayButton onClick={handlePlay} title="运行命令">
+      <PlayButton onClick={handlePlay} title={t("components.commandItem.run")}>
         <PlayCircleOutlined />
       </PlayButton>
-      <StatusIcon title="状态">
+      <StatusIcon title={t("components.commandItem.status")}>
         <FileOutlined />
       </StatusIcon>
       <CommandName>{command.name}</CommandName>

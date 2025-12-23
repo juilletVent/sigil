@@ -1,5 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router";
 import styled from "styled-components";
+import { useTranslation } from "react-i18next";
 import SecondaryNavBar from "../components/SecondaryNavBar";
 import CommandForm, { CommandFormValues } from "../components/CommandForm";
 import { AppRoutes } from "../constants/routes";
@@ -39,13 +40,14 @@ const PageTitle = styled.h3`
 // ==================== 主组件 ====================
 
 function ConfigEdit() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const commandId = searchParams.get("id");
 
   // 判断是新增还是编辑模式
   const isEditMode = !!commandId;
-  const pageTitle = isEditMode ? "编辑配置" : "添加配置";
+  const pageTitle = isEditMode ? t("pages.configEdit.titleEdit") : t("pages.configEdit.titleAdd");
 
   // 如果是编辑模式，这里应该根据id获取命令数据
   // 暂时使用模拟数据
