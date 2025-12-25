@@ -5,7 +5,10 @@
     "confirm": "Confirm",
     "reset": "Reset",
     "back": "Back",
-    "version": "Version"
+    "version": "Version",
+    "updateSuccess": "Update Success",
+    "createSuccess": "Create Success",
+    "saveFailed": "Save Failed"
   },
   "pages": {
     "home": {
@@ -34,7 +37,21 @@
       "autoStart": "Start on system startup",
       "language": "Language",
       "languageZhCN": "简体中文",
-      "languageEnUS": "English"
+      "languageEnUS": "English",
+      "loadConfigFailed": "Failed to load configuration",
+      "saveSettingsFailed": "Failed to save settings",
+      "languageSaved": "Language settings saved",
+      "saveLanguageFailed": "Failed to save language settings"
+    },
+    "commandLog": {
+      "title": "Command Log",
+      "noLogs": "No log output yet",
+      "stdout": "Standard Output",
+      "stderr": "Standard Error",
+      "clearLogs": "Clear Logs",
+      "clearLogsConfirm": "Are you sure you want to clear all logs?",
+      "clearSuccess": "Logs cleared",
+      "clearFailed": "Failed to clear logs"
     }
   },
   "components": {
@@ -50,7 +67,8 @@
       "sudoTooltip": "Run with administrator privileges",
       "workingDirectory": "Working Directory",
       "workingDirectoryTooltip": "Working directory for command execution",
-      "workingDirectoryPlaceholder": "Select working directory",
+      "workingDirectoryPlaceholder": "Click button to select working directory",
+      "selectDirectory": "Select Directory",
       "url": "Associated URL",
       "urlTooltip": "Related URL address, can be quickly opened",
       "urlPlaceholder": "Enter URL",
@@ -59,9 +77,16 @@
     },
     "toolbar": {
       "addCommand": "Add Command",
+      "import": "Import",
+      "export": "Export",
       "sort": "Sort",
       "settings": "Settings",
-      "info": "Info"
+      "info": "Info",
+      "exportSuccess": "Export Success",
+      "exportFailed": "Export Failed",
+      "importSuccess": "Import Success: {{success}} items, skipped {{skip}} items",
+      "importFailed": "Import Failed",
+      "importNoData": "No data to import"
     },
     "statusBar": {
       "cpu": "CPU:",
@@ -69,7 +94,26 @@
     },
     "commandItem": {
       "run": "Run Command",
-      "status": "Status"
+      "stop": "Stop Command",
+      "status": "Status",
+      "openUrl": "Open Associated URL",
+      "openUrlFailed": "Failed to Open URL",
+      "viewLogs": "View Logs",
+      "copy": "Copy",
+      "delete": "Delete",
+      "deleteConfirmTitle": "Confirm Delete",
+      "deleteConfirmContent": "Are you sure you want to delete command \"{{name}}\"? This action cannot be undone.",
+      "copySuccess": "Copy Success",
+      "copyFailed": "Copy Failed",
+      "deleteSuccess": "Delete Success",
+      "deleteFailed": "Delete Failed",
+      "executeSuccess": "Command Started",
+      "executeFailed": "Failed to Execute Command",
+      "stopSuccess": "Command Stopped",
+      "stopFailed": "Failed to Stop Command"
+    },
+    "commandList": {
+      "emptyDescription": "No commands yet. Click the add button in the top left to create a command"
     }
   }
 }

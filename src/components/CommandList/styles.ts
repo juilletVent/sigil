@@ -6,7 +6,7 @@ export const ListContainer = styled.div`
   padding: 0;
 `;
 
-export const CommandItemContainer = styled.div`
+export const CommandItemContainer = styled.div<{ $isDragging?: boolean }>`
   display: flex;
   align-items: center;
   padding: 8px 12px;
@@ -15,6 +15,7 @@ export const CommandItemContainer = styled.div`
   border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: background-color 0.2s;
+  z-index: ${(props) => (props.$isDragging ? 1000 : "auto")};
 
   &:hover {
     background-color: #f5f5f5;
@@ -30,7 +31,35 @@ export const CommandItemContainer = styled.div`
   }
 `;
 
-export const PlayButton = styled.button`
+export const DragHandle = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  cursor: grab;
+  color: #bbb;
+  font-size: 14px;
+  transition: color 0.2s;
+
+  &:hover {
+    color: #666;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    color: #555;
+
+    &:hover {
+      color: #999;
+    }
+  }
+`;
+
+export const PlayButton = styled.button<{ $isRunning?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -41,18 +70,18 @@ export const PlayButton = styled.button`
   cursor: pointer;
   padding: 0;
   font-size: 20px;
-  color: #666;
+  color: ${(props) => (props.$isRunning ? "#ff4d4f" : "#666")};
   transition: color 0.2s;
 
   &:hover {
-    color: #1890ff;
+    color: ${(props) => (props.$isRunning ? "#ff7875" : "#1890ff")};
   }
 
   @media (prefers-color-scheme: dark) {
-    color: #aaa;
+    color: ${(props) => (props.$isRunning ? "#ff4d4f" : "#aaa")};
 
     &:hover {
-      color: #40a9ff;
+      color: ${(props) => (props.$isRunning ? "#ff7875" : "#40a9ff")};
     }
   }
 `;
@@ -76,22 +105,20 @@ export const CommandName = styled.span`
   font-size: 14px;
   color: #333;
   user-select: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 
   @media (prefers-color-scheme: dark) {
     color: #ddd;
   }
 `;
 
-export const EmptyState = styled.div`
+export const EmptyStateContainer = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
-  color: #999;
-  font-size: 14px;
-
-  @media (prefers-color-scheme: dark) {
-    color: #666;
-  }
+  padding: 80px 20px;
+  min-height: 300px;
 `;
 

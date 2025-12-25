@@ -1,9 +1,10 @@
 import { Button } from "antd";
 import {
   PlusOutlined,
-  UnorderedListOutlined,
   SettingOutlined,
   InfoCircleOutlined,
+  ImportOutlined,
+  ExportOutlined,
 } from "@ant-design/icons";
 import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
@@ -12,11 +13,12 @@ import { ToolBarContainer, LeftActions, RightActions } from "./styles";
 
 interface ToolBarProps {
   onAddCommand?: () => void;
-  onSort?: () => void;
   onSettings?: () => void;
+  onImport?: () => void;
+  onExport?: () => void;
 }
 
-function ToolBar({ onAddCommand, onSort, onSettings }: ToolBarProps) {
+function ToolBar({ onAddCommand, onSettings, onImport, onExport }: ToolBarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
 
@@ -33,14 +35,20 @@ function ToolBar({ onAddCommand, onSort, onSettings }: ToolBarProps) {
           onClick={onAddCommand}
           title={t("components.toolbar.addCommand")}
         />
-      </LeftActions>
-      <RightActions>
         <Button
           type="text"
-          icon={<UnorderedListOutlined />}
-          onClick={onSort}
-          title={t("components.toolbar.sort")}
+          icon={<ImportOutlined />}
+          onClick={onImport}
+          title={t("components.toolbar.import")}
         />
+        <Button
+          type="text"
+          icon={<ExportOutlined />}
+          onClick={onExport}
+          title={t("components.toolbar.export")}
+        />
+      </LeftActions>
+      <RightActions>
         <Button
           type="text"
           icon={<SettingOutlined />}
@@ -59,4 +67,3 @@ function ToolBar({ onAddCommand, onSort, onSettings }: ToolBarProps) {
 }
 
 export default ToolBar;
-

@@ -1,8 +1,9 @@
-import { useState } from "react";
-import { Checkbox, Radio } from "antd";
+import { useState, useEffect } from "react";
+import { Checkbox, Radio, message } from "antd";
 import styled from "styled-components";
 import { useTranslation } from "react-i18next";
 import SecondaryNavBar from "../components/SecondaryNavBar";
+import { configApi, CONFIG_KEYS } from "../api/database";
 
 // ==================== 样式组件 ====================
 
@@ -61,26 +62,54 @@ const SettingLabel = styled.div`
 
 function SystemConfig() {
   const { t, i18n } = useTranslation();
-  
-  // 从 localStorage 读取初始值
-  const [autoStart, setAutoStart] = useState<boolean>(() => {
-    const saved = localStorage.getItem("autoStart");
-    return saved === "true";
-  });
+  const [autoStart, setAutoStart] = useState<boolean>(false);
+
+  // 加载配置
+  useEffect(() => {
+    loadConfigs();
+  }, []);
+
+  const loadConfigs = async () => {
+    try {
+      // 加载开机自启动配置
+      const autoStartValue = await configApi.get(CONFIG_KEYS.AUTO_START);
+      setAutoStart(autoStartValue === "true");
+
+      // 加载语言配置
+      const languageValue = await configApi.get(CONFIG_KEYS.LANGUAGE);
+      if (languageValue) {
+        i18n.changeLanguage(languageValue);
+      }
+    } catch (error) {
+      console.error("Failed to load config:", error);
+      message.error(t("pages.systemConfig.loadConfigFailed"));
+    }
+  };
 
   // 处理开机自启动变化
-  const handleAutoStartChange = (checked: boolean) => {
-    setAutoStart(checked);
-    localStorage.setItem("autoStart", String(checked));
-    console.log("开机自启动设置已更新:", checked);
-    // TODO: 后续可以对接 Tauri API 来实现真正的开机自启动功能
+  const handleAutoStartChange = async (checked: boolean) => {
+    try {
+      setAutoStart(checked);
+      await configApi.set(CONFIG_KEYS.AUTO_START, String(checked));
+      // TODO: 后续可以对接 Tauri API 来实现真正的开机自启动功能
+    } catch (error) {
+      console.error("Failed to save auto-start setting:", error);
+      message.error(t("pages.systemConfig.saveSettingsFailed"));
+      // 回滚状态
+      setAutoStart(!checked);
+    }
   };
 
   // 处理语言切换
-  const handleLanguageChange = (language: string) => {
-    i18n.changeLanguage(language);
-    console.log("语言已切换为:", language);
-    // TODO: 后续可以将语言设置持久化到localStorage
+  const handleLanguageChange = async (language: string) => {
+    try {
+      i18n.changeLanguage(language);
+      await configApi.set(CONFIG_KEYS.LANGUAGE, language);
+      message.success(t("pages.systemConfig.languageSaved"));
+    } catch (error) {
+      console.error("Failed to save language setting:", error);
+      message.error(t("pages.systemConfig.saveLanguageFailed"));
+    }
   };
 
   return (

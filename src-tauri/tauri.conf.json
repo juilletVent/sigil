@@ -15,8 +15,10 @@
         "title": "Sigil",
         "width": 400,
         "height": 750,
-        "resizable": false,
-        "maximizable": false,
+        "minWidth": 400,
+        "minHeight": 750,
+        "resizable": true,
+        "maximizable": true,
         "center": true,
         "devtools": true
       }
