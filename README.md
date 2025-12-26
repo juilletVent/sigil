@@ -24,6 +24,7 @@
 ## 技术栈
 
 ### 前端
+
 - **React 19** - 用户界面框架
 - **TypeScript** - 类型安全
 - **Ant Design 6** - UI 组件库
@@ -32,6 +33,7 @@
 - **i18next** - 国际化支持
 
 ### 后端
+
 - **Rust** - 系统级编程语言
 - **Tauri 2** - 轻量级桌面应用框架
 - **SQLite** - 本地数据库存储
@@ -190,6 +192,7 @@ cd src-tauri && cargo test
 ### 系统设置
 
 在系统设置页面可以：
+
 - 配置开机自启动
 - 切换界面语言（中文/英文）
 
@@ -205,14 +208,6 @@ pnpm tauri build
 # - Windows: src-tauri/target/release/bundle/nsis/sigil_0.1.0_x64-setup.exe
 # - MSI: src-tauri/target/release/bundle/msi/sigil_0.1.0_x64_en-US.msi
 ```
-
-### CI/CD
-
-项目配置了 GitHub Actions 和 GitLab CI，支持：
-- 自动运行测试
-- 代码检查（lint）
-- 自动构建 Windows 应用
-- 自动发布到 GitHub Releases 和 GitLab Release（基于 git tag）
 
 ## 贡献
 
