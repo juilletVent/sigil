@@ -1,3 +1,5 @@
+use crate::db::Database;
+use crate::i18n::{get_language_from_db, Translations};
 use image::GenericImageView;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
@@ -29,10 +31,14 @@ fn disable_system_menu(_window: &tauri::WebviewWindow) {
 
 /// 设置主窗口
 pub fn setup_main_window(app: &App) -> Result<tauri::WebviewWindow, String> {
+    // 获取数据库以读取语言设置
+    let database = app.state::<Database>();
+    let language = get_language_from_db(database.inner());
+    
     // 获取主窗口
     let window = app
         .get_webview_window("main")
-        .ok_or("无法获取主窗口")?;
+        .ok_or_else(|| Translations::error_get_main_window(language))?;
 
     // 禁用系统菜单
     disable_system_menu(&window);
@@ -55,20 +61,24 @@ pub fn setup_main_window(app: &App) -> Result<tauri::WebviewWindow, String> {
 
 /// 设置系统托盘
 pub fn setup_tray(app: &App, window: tauri::WebviewWindow) -> Result<(), String> {
+    // 获取数据库以读取语言设置
+    let database = app.state::<Database>();
+    let language = get_language_from_db(database.inner());
+    
     // 创建托盘菜单
-    let show_item = MenuItem::with_id(app, "show", "显示/隐藏", true, None::<&str>)
-        .map_err(|e| format!("创建菜单项失败: {}", e))?;
-    let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)
-        .map_err(|e| format!("创建菜单项失败: {}", e))?;
+    let show_item = MenuItem::with_id(app, "show", Translations::tray_show(language), true, None::<&str>)
+        .map_err(|e| Translations::error_create_menu_item(language, &e.to_string()))?;
+    let quit_item = MenuItem::with_id(app, "quit", Translations::tray_quit(language), true, None::<&str>)
+        .map_err(|e| Translations::error_create_menu_item(language, &e.to_string()))?;
     let menu = Menu::with_items(app, &[&show_item, &quit_item])
-        .map_err(|e| format!("创建菜单失败: {}", e))?;
+        .map_err(|e| Translations::error_create_menu(language, &e.to_string()))?;
 
     let window_for_tray = window.clone();
 
     // 使用编译时嵌入的图标（确保在打包后也能正确加载）
     let icon = include_bytes!("../icons/128x128.png");
     let icon_image =
-        image::load_from_memory(icon).map_err(|e| format!("加载图标失败: {}", e))?;
+        image::load_from_memory(icon).map_err(|e| Translations::error_load_icon(language, &e.to_string()))?;
     let (width, height) = icon_image.dimensions();
     let rgba = icon_image.to_rgba8().into_raw();
     let tray_icon = tauri::image::Image::new_owned(rgba, width, height);
@@ -115,7 +125,7 @@ pub fn setup_tray(app: &App, window: tauri::WebviewWindow) -> Result<(), String>
             }
         })
         .build(app)
-        .map_err(|e| format!("构建托盘失败: {}", e))?;
+        .map_err(|e| Translations::error_build_tray(language, &e.to_string()))?;
 
     Ok(())
 }
@@ -128,13 +138,17 @@ pub fn create_log_window(
     command_id: i64,
     command_name: &str,
 ) -> Result<(), String> {
+    // 获取数据库以读取语言设置
+    let database = app.state::<Database>();
+    let language = get_language_from_db(database.inner());
+    
     let window_label = format!("log-{}", command_id);
 
     // 检查窗口是否已存在
     if let Some(window) = app.get_webview_window(&window_label) {
         // 窗口已存在，显示并聚焦
-        window.show().map_err(|e| format!("显示窗口失败: {}", e))?;
-        window.set_focus().map_err(|e| format!("聚焦窗口失败: {}", e))?;
+        window.show().map_err(|e| Translations::error_show_window(language, &e.to_string()))?;
+        window.set_focus().map_err(|e| Translations::error_focus_window(language, &e.to_string()))?;
         return Ok(());
     }
 
@@ -144,7 +158,7 @@ pub fn create_log_window(
         command_id,
         urlencoding::encode(command_name)
     );
-    let title = format!("命令日志 - {}", command_name);
+    let title = Translations::log_window_title(language, command_name);
 
     WebviewWindowBuilder::new(
         app,
@@ -156,7 +170,7 @@ pub fn create_log_window(
     .min_inner_size(200.0, 200.0)
     .resizable(true)
     .build()
-    .map_err(|e| format!("创建窗口失败: {}", e))?;
+    .map_err(|e| Translations::error_create_window(language, &e.to_string()))?;
 
     Ok(())
 }

@@ -1,8 +1,10 @@
 // ==================== 模块声明 ====================
 
+mod autostart;
 mod command_runner;
 mod commands;
 mod db;
+mod i18n;
 mod monitor;
 mod window;
 
@@ -45,6 +47,40 @@ pub fn run() {
             start_high_frequency_monitor(app.handle().clone());
             start_low_frequency_monitor(app.handle().clone());
 
+            // 同步开机自启动状态
+            #[cfg(target_os = "windows")]
+            {
+                let database = app.state::<Database>();
+                if let Ok(Some(auto_start_value)) = database.get_config("auto_start") {
+                    let should_enable = auto_start_value == "true";
+                    let app_name = "sigil";
+                    
+                    match autostart::is_autostart_enabled(app_name) {
+                        Ok(is_enabled) => {
+                            if should_enable && !is_enabled {
+                                // 数据库配置为启用，但注册表未设置，则设置注册表
+                                if let Ok(app_path) = app
+                                    .path()
+                                    .resolve("sigil.exe", tauri::path::BaseDirectory::Executable)
+                                    .or_else(|_| std::env::current_exe())
+                                {
+                                    let _ = autostart::enable_autostart(
+                                        app_name,
+                                        &app_path.to_string_lossy(),
+                                    );
+                                }
+                            } else if !should_enable && is_enabled {
+                                // 数据库配置为禁用，但注册表已设置，则清除注册表
+                                let _ = autostart::disable_autostart(app_name);
+                            }
+                        }
+                        Err(_) => {
+                            // 检查失败，忽略
+                        }
+                    }
+                }
+            }
+
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
@@ -77,7 +113,12 @@ pub fn run() {
             // 日志相关命令
             get_command_logs,
             clear_command_logs,
-            open_log_window
+            open_log_window,
+            update_log_window_title,
+            // 开机自启动命令
+            enable_autostart,
+            disable_autostart,
+            check_autostart_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -56,7 +56,11 @@
       "loadConfigFailed": "加载配置失败",
       "saveSettingsFailed": "保存设置失败",
       "languageSaved": "语言设置已保存",
-      "saveLanguageFailed": "保存语言设置失败"
+      "saveLanguageFailed": "保存语言设置失败",
+      "autostartEnabled": "开机自启动已启用",
+      "autostartDisabled": "开机自启动已禁用",
+      "autostartEnableFailed": "启用开机自启动失败",
+      "autostartDisableFailed": "禁用开机自启动失败"
     },
     "commandLog": {
       "title": "命令日志",
@@ -66,7 +70,11 @@
       "clearLogs": "清空日志",
       "clearLogsConfirm": "确认清空所有日志？",
       "clearSuccess": "日志已清空",
-      "clearFailed": "清空日志失败"
+      "clearFailed": "清空日志失败",
+      "scrollToTop": "到顶部",
+      "scrollToBottom": "到底部",
+      "unknownCommand": "未知命令",
+      "loadLogsFailed": "加载日志失败"
     }
   },
   "components": {

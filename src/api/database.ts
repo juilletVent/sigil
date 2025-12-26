@@ -223,6 +223,34 @@ export const commandExecutionApi = {
   },
 };
 
+// ==================== 开机自启动 API ====================
+
+/**
+ * 开机自启动相关 API
+ */
+export const autostartApi = {
+  /**
+   * 启用开机自启动
+   */
+  enable: async (): Promise<void> => {
+    return await invoke<void>("enable_autostart");
+  },
+
+  /**
+   * 禁用开机自启动
+   */
+  disable: async (): Promise<void> => {
+    return await invoke<void>("disable_autostart");
+  },
+
+  /**
+   * 检查开机自启动状态
+   */
+  checkStatus: async (): Promise<boolean> => {
+    return await invoke<boolean>("check_autostart_status");
+  },
+};
+
 // ==================== 配置键常量 ====================
 
 /**

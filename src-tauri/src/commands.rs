@@ -1,8 +1,10 @@
+use crate::autostart;
 use crate::command_runner::{CommandRunner, CommandState, ExecuteCommandParams};
 use crate::db::{self, CreateCommandInput, Database, UpdateCommandInput};
+use crate::i18n::{get_language_from_db, Translations};
 use crate::monitor::{DiskInfo, DiskMonitorState, MonitorState, SystemInfo};
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, EventTarget, Manager, State};
 
 // ==================== 系统监控命令 ====================
 
@@ -109,8 +111,20 @@ pub fn get_system_config(database: State<Database>, key: String) -> Result<Optio
 
 /// 设置系统配置
 #[tauri::command]
-pub fn set_system_config(database: State<Database>, key: String, value: String) -> Result<(), String> {
-    database.set_config(&key, &value)
+pub fn set_system_config(
+    app: AppHandle,
+    database: State<Database>,
+    key: String,
+    value: String,
+) -> Result<(), String> {
+    database.set_config(&key, &value)?;
+    
+    // 如果设置的是语言配置，广播语言变化事件到所有窗口
+    if key == "language" {
+        let _ = app.emit_to(EventTarget::Any, "language-changed", value);
+    }
+    
+    Ok(())
 }
 
 /// 获取所有系统配置
@@ -353,5 +367,80 @@ pub async fn open_log_window(
     command_name: String,
 ) -> Result<(), String> {
     crate::window::create_log_window(&app, command_id, &command_name)
+}
+
+/// 更新日志窗口标题
+#[tauri::command]
+pub async fn update_log_window_title(
+    app: AppHandle,
+    command_id: i64,
+    command_name: String,
+) -> Result<(), String> {
+    let database = app.state::<Database>();
+    let language = crate::i18n::get_language_from_db(database.inner());
+    let window_label = format!("log-{}", command_id);
+    
+    if let Some(window) = app.get_webview_window(&window_label) {
+        let title = crate::i18n::Translations::log_window_title(language, &command_name);
+        window.set_title(&title)
+            .map_err(|e| format!("更新窗口标题失败: {}", e))?;
+    }
+    
+    Ok(())
+}
+
+// ==================== 开机自启动相关命令 ====================
+
+/// 启用开机自启动
+#[tauri::command]
+pub fn enable_autostart(app: AppHandle, database: State<Database>) -> Result<(), String> {
+    let language = get_language_from_db(database.inner());
+    
+    // 获取应用名称（从 productName 或使用默认值）
+    let app_name = "sigil";
+    
+    // 获取应用可执行文件路径
+    let app_path = app
+        .path()
+        .resolve("sigil.exe", tauri::path::BaseDirectory::Executable)
+        .or_else(|_| {
+            // Fallback 到 env::current_exe()
+            std::env::current_exe()
+                .map_err(|e| Translations::autostart_get_path_failed(language, &e.to_string()))
+        })
+        .map_err(|e| e)?
+        .to_string_lossy()
+        .to_string();
+    
+    // 启用自启动
+    autostart::enable_autostart(app_name, &app_path)
+        .map_err(|e| Translations::autostart_enable_failed(language, &e))?;
+    
+    Ok(())
+}
+
+/// 禁用开机自启动
+#[tauri::command]
+pub fn disable_autostart(_app: AppHandle, database: State<Database>) -> Result<(), String> {
+    let language = get_language_from_db(database.inner());
+    
+    // 获取应用名称
+    let app_name = "sigil";
+    
+    // 禁用自启动
+    autostart::disable_autostart(app_name)
+        .map_err(|e| Translations::autostart_disable_failed(language, &e))?;
+    
+    Ok(())
+}
+
+/// 检查开机自启动状态
+#[tauri::command]
+pub fn check_autostart_status(_app: AppHandle, _database: State<Database>) -> Result<bool, String> {
+    // 获取应用名称
+    let app_name = "sigil";
+    
+    // 检查自启动状态
+    autostart::is_autostart_enabled(app_name)
 }
 

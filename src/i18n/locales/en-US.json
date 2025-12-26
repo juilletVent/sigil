@@ -41,7 +41,11 @@
       "loadConfigFailed": "Failed to load configuration",
       "saveSettingsFailed": "Failed to save settings",
       "languageSaved": "Language settings saved",
-      "saveLanguageFailed": "Failed to save language settings"
+      "saveLanguageFailed": "Failed to save language settings",
+      "autostartEnabled": "Autostart enabled",
+      "autostartDisabled": "Autostart disabled",
+      "autostartEnableFailed": "Failed to enable autostart",
+      "autostartDisableFailed": "Failed to disable autostart"
     },
     "commandLog": {
       "title": "Command Log",
@@ -51,7 +55,11 @@
       "clearLogs": "Clear Logs",
       "clearLogsConfirm": "Are you sure you want to clear all logs?",
       "clearSuccess": "Logs cleared",
-      "clearFailed": "Failed to clear logs"
+      "clearFailed": "Failed to clear logs",
+      "scrollToTop": "Scroll to Top",
+      "scrollToBottom": "Scroll to Bottom",
+      "unknownCommand": "Unknown Command",
+      "loadLogsFailed": "Failed to load logs"
     }
   },
   "components": {
