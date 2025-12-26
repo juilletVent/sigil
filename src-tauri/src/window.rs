@@ -153,6 +153,18 @@ pub fn setup_tray(app: &App, window: tauri::WebviewWindow) -> Result<(), String>
     Ok(())
 }
 
+// ==================== 路由常量 ====================
+
+/// 命令日志路由路径模板
+const COMMAND_LOG_ROUTE: &str = "/log/:commandId";
+
+/// 生成命令日志路由路径
+fn get_command_log_path(command_id: i64, command_name: &str) -> String {
+    let base_path = format!("/#{}", COMMAND_LOG_ROUTE.replace(":commandId", &command_id.to_string()));
+    let encoded_name = urlencoding::encode(command_name);
+    format!("{}?name={}", base_path, encoded_name)
+}
+
 // ==================== 日志窗口管理 ====================
 
 /// 创建或显示日志窗口
@@ -176,11 +188,7 @@ pub fn create_log_window(
     }
 
     // 创建新窗口 - 使用路由
-    let url_path = format!(
-        "/#/log/{}?name={}",
-        command_id,
-        urlencoding::encode(command_name)
-    );
+    let url_path = get_command_log_path(command_id, command_name);
     let title = Translations::log_window_title(language, command_name);
 
     WebviewWindowBuilder::new(

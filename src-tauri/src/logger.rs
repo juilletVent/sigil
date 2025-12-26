@@ -51,14 +51,22 @@ pub fn init_logger(app_handle: &AppHandle) -> Result<(), String> {
         .map_err(|e| format!("创建程序运行目录失败: {}", e))?;
 
     // 日志文件路径
-    let log_file_path = app_dir.join("sigil.log");
+    // 规范化路径（如果可能），确保带空格的路径被正确处理
+    let log_file_path = if let Ok(canonical_dir) = app_dir.canonicalize() {
+        canonical_dir.join("sigil.log")
+    } else {
+        // 如果无法规范化（例如目录不存在），使用原始路径
+        // PathBuf 本身就能正确处理带空格的路径
+        app_dir.join("sigil.log")
+    };
 
     // 打开日志文件
+    // OpenOptions::open 接受 AsRef<Path>，PathBuf 实现了这个 trait，能正确处理带空格的路径
     let log_file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&log_file_path)
-        .map_err(|e| format!("打开日志文件失败: {}", e))?;
+        .map_err(|e| format!("打开日志文件失败: {}。路径: {:?}", e, log_file_path))?;
 
     // 保存文件句柄
     {
@@ -111,7 +119,14 @@ pub fn init_logger(app_handle: &AppHandle) -> Result<(), String> {
 
 /// 记录错误到日志文件（用于在日志系统初始化之前记录错误）
 pub fn log_error_to_file(app_dir: &PathBuf, error: &str) {
-    let log_file_path = app_dir.join("sigil.log");
+    // 规范化路径（如果可能），确保带空格的路径被正确处理
+    let log_file_path = if let Ok(canonical_dir) = app_dir.canonicalize() {
+        canonical_dir.join("sigil.log")
+    } else {
+        // 如果无法规范化，使用原始路径
+        app_dir.join("sigil.log")
+    };
+    
     if let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)

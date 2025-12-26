@@ -17,5 +17,8 @@ export enum AppRoutes {
   
   /** 命令配置页面 - 新增/编辑命令 */
   CONFIG_EDIT = "/config-edit",
+  
+  /** 命令日志页面 - 查看命令执行日志 */
+  COMMAND_LOG = "/log/:commandId",
 }
 

@@ -57,7 +57,7 @@ function App() {
             element={<SystemConfig />} 
           />
           <Route 
-            path="/log/:commandId" 
+            path={AppRoutes.COMMAND_LOG} 
             element={<CommandLog />} 
           />
         </Routes>

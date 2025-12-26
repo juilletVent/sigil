@@ -110,7 +110,18 @@ impl Database {
         // 数据库文件路径
         let db_path = app_dir.join(constants::DB_FILE_NAME);
         
+        // 规范化路径（如果可能），确保带空格的路径被正确处理
+        // 注意：如果文件不存在，canonicalize 会失败，所以先尝试规范化目录
+        let db_path = if let Ok(canonical_dir) = app_dir.canonicalize() {
+            canonical_dir.join(constants::DB_FILE_NAME)
+        } else {
+            // 如果无法规范化（例如文件不存在），使用原始路径
+            // PathBuf 本身就能正确处理带空格的路径
+            db_path
+        };
+        
         // 连接数据库（如果文件不存在会自动创建）
+        // Connection::open 接受 AsRef<Path>，PathBuf 实现了这个 trait，能正确处理带空格的路径
         let conn = Connection::open(&db_path).map_err(|e| {
             format!(
                 "打开数据库失败: {}。路径: {:?}。请确保有足够的磁盘空间和文件系统权限。",

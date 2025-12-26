@@ -328,15 +328,19 @@ pub fn import_commands(database: State<Database>, json_data: String) -> Result<I
 /// 将导出数据写入文件
 #[tauri::command]
 pub fn write_export_file(file_path: String, data: String) -> Result<(), String> {
-    std::fs::write(&file_path, data)
-        .map_err(|e| format!("写入文件失败: {}", e))
+    // 使用 PathBuf 处理路径，确保带空格的路径被正确处理
+    let path = std::path::PathBuf::from(&file_path);
+    std::fs::write(&path, data)
+        .map_err(|e| format!("写入文件失败: {}。路径: {:?}", e, path))
 }
 
 /// 从文件读取导入数据
 #[tauri::command]
 pub fn read_import_file(file_path: String) -> Result<String, String> {
-    std::fs::read_to_string(&file_path)
-        .map_err(|e| format!("读取文件失败: {}", e))
+    // 使用 PathBuf 处理路径，确保带空格的路径被正确处理
+    let path = std::path::PathBuf::from(&file_path);
+    std::fs::read_to_string(&path)
+        .map_err(|e| format!("读取文件失败: {}。路径: {:?}", e, path))
 }
 
 // ==================== 日志相关命令 ====================
