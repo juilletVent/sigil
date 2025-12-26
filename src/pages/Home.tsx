@@ -9,7 +9,7 @@ import { invoke } from "@tauri-apps/api/core";
 import StatusBar from "../components/StatusBar";
 import ToolBar from "../components/ToolBar";
 import CommandList from "../components/CommandList";
-import { Command } from "../components/CommandList/CommandItem";
+import type { CommandItem } from "../types";
 import { AppRoutes } from "../constants/routes";
 import { commandApi, commandExecutionApi, CommandState } from "../api/database";
 
@@ -38,7 +38,7 @@ const MainContent = styled.div`
 function Home() {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const [commands, setCommands] = useState<Command[]>([]);
+  const [commands, setCommands] = useState<CommandItem[]>([]);
 
   // 加载命令列表
   useEffect(() => {
@@ -59,8 +59,8 @@ function Home() {
   const loadCommands = async () => {
     try {
       const data = await commandApi.getAll();
-      // 转换数据格式以匹配 Command 接口
-      const formattedCommands: Command[] = data.map((cmd) => ({
+      // 转换数据格式以匹配 CommandItem 接口
+      const formattedCommands: CommandItem[] = data.map((cmd) => ({
         id: cmd.id.toString(),
         name: cmd.name,
         isRunning: false,
@@ -110,7 +110,7 @@ function Home() {
   };
 
   // 处理拖拽排序
-  const handleReorder = async (newCommands: Command[]) => {
+  const handleReorder = async (newCommands: CommandItem[]) => {
     try {
       // 立即更新 UI
       setCommands(newCommands);
@@ -297,7 +297,7 @@ function Home() {
 
         // 如果有失败项，显示详细信息
         if (result.failed_items.length > 0) {
-          console.log("导入失败项:", result.failed_items);
+          // 失败项已在 message 中显示，无需额外日志
         }
       }
     } catch (error) {

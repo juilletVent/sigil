@@ -27,14 +27,24 @@ pub fn disable_autostart(app_name: &str) -> Result<(), String> {
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
     let path = r"Software\Microsoft\Windows\CurrentVersion\Run";
     
-    let key = hkcu
-        .open_subkey(path)
+    // 使用 create_subkey 以获取写权限，如果键不存在则创建，存在则打开
+    let (key, _) = hkcu
+        .create_subkey(path)
         .map_err(|e| format!("无法打开注册表: {}", e))?;
     
-    key.delete_value(app_name)
-        .map_err(|e| format!("无法删除注册表值: {}", e))?;
-    
-    Ok(())
+    // 尝试删除值，如果值不存在则忽略错误（可能已经被删除）
+    match key.delete_value(app_name) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            let error_str = e.to_string();
+            // 如果值不存在（已经被删除），不算错误
+            if error_str.contains("not found") || error_str.contains("系统找不到") {
+                Ok(())
+            } else {
+                Err(format!("无法删除注册表值: {}", e))
+            }
+        }
+    }
 }
 
 /// 检查开机自启动是否已启用

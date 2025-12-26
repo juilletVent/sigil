@@ -103,6 +103,7 @@ impl Translations {
     }
 
     /// 开机自启动相关消息
+    #[allow(dead_code)]
     pub fn autostart_enabled(lang: Language) -> String {
         match lang {
             Language::ZhCN => "开机自启动已启用".to_string(),
@@ -110,6 +111,7 @@ impl Translations {
         }
     }
 
+    #[allow(dead_code)]
     pub fn autostart_disabled(lang: Language) -> String {
         match lang {
             Language::ZhCN => "开机自启动已禁用".to_string(),

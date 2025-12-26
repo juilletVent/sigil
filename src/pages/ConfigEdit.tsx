@@ -4,7 +4,8 @@ import styled from "styled-components";
 import { useTranslation } from "react-i18next";
 import { message, Spin } from "antd";
 import SecondaryNavBar from "../components/SecondaryNavBar";
-import CommandForm, { CommandFormValues } from "../components/CommandForm";
+import CommandForm from "../components/CommandForm";
+import type { CommandFormValues } from "../types";
 import { AppRoutes } from "../constants/routes";
 import { commandApi } from "../api/database";
 

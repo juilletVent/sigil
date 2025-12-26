@@ -83,12 +83,38 @@ unsafe impl Send for JobHandle {}
 #[cfg(target_os = "windows")]
 unsafe impl Sync for JobHandle {}
 
+// ==================== Windows 权限检测 ====================
+
+/// 检测当前进程是否以管理员权限运行
+/// 使用简单的方法：尝试执行一个需要管理员权限的命令
+#[cfg(target_os = "windows")]
+fn is_elevated() -> bool {
+    // 使用 net session 命令来检查管理员权限
+    // 如果命令成功执行（退出码为 0），说明有管理员权限
+    let output = std::process::Command::new("net")
+        .args(&["session"])
+        .output();
+    
+    match output {
+        Ok(result) => {
+            // net session 在非管理员权限下会返回非零退出码
+            result.status.success()
+        }
+        Err(_) => {
+            // 如果命令执行失败，假设没有管理员权限
+            false
+        }
+    }
+}
+
 // ==================== 命令运行器 ====================
 
 /// 命令运行信息（包含执行参数）
 #[derive(Debug, Clone)]
 struct CommandInfo {
     params: ExecuteCommandParams,
+    #[cfg(target_os = "windows")]
+    temp_files: Option<(PathBuf, PathBuf, PathBuf, PathBuf)>, // (batch_file, output_file, error_file, exit_file)
 }
 
 /// 命令运行器 - 管理所有命令的执行状态
@@ -171,48 +197,186 @@ impl CommandRunner {
         }
 
         // 构建命令
-        let mut cmd = if cfg!(target_os = "windows") {
-            // Windows: 使用 cmd /K 而不是 /C，这样 cmd.exe 会保持运行
-            // 然后在命令后面加上 & exit，让命令执行完后退出
-            // 但为了能够终止，我们使用 powershell 或者保持 cmd 运行
-            let mut c = Command::new("cmd");
-            // 使用 /C 但添加 CREATE_NEW_PROCESS_GROUP 标志
-            c.args(["/C", &params.command]);
-            // Windows 进程创建标志：
-            // CREATE_NEW_PROCESS_GROUP = 0x00000200
-            // CREATE_NEW_CONSOLE = 0x00000010 (创建新控制台窗口)
-            c.creation_flags(0x00000200 | 0x08000000); // 添加 CREATE_NO_WINDOW
-            c
+        // Windows UAC 提升需要使用临时批处理文件来捕获输出
+        // 但如果当前进程已有管理员权限，则不需要临时文件
+        #[cfg(target_os = "windows")]
+        let (temp_batch_file, temp_output_file, temp_error_file, temp_exit_file) = if params.sudo && !is_elevated() {
+            // 创建临时文件用于 UAC 提升执行
+            let temp_dir = std::env::temp_dir();
+            let file_prefix = format!("sigil_cmd_{}", params.command_id);
+            
+            let batch_file = temp_dir.join(format!("{}.bat", file_prefix));
+            let output_file = temp_dir.join(format!("{}_stdout.txt", file_prefix));
+            let error_file = temp_dir.join(format!("{}_stderr.txt", file_prefix));
+            let exit_file = temp_dir.join(format!("{}_exit.txt", file_prefix));
+            
+            // 创建批处理文件，将命令输出重定向到临时文件
+            let working_dir = params.working_directory.as_ref()
+                .map(|wd| wd.replace('"', "\""))
+                .unwrap_or_else(|| "%CD%".to_string());
+            
+            let batch_content = format!(
+                "@echo off\n\
+                cd /d \"{}\"\n\
+                ({}) > \"{}\" 2> \"{}\"\n\
+                echo %ERRORLEVEL% > \"{}\"",
+                working_dir,
+                params.command.replace('"', "\""),
+                output_file.to_string_lossy().replace('"', "\""),
+                error_file.to_string_lossy().replace('"', "\""),
+                exit_file.to_string_lossy().replace('"', "\"")
+            );
+            
+            std::fs::write(&batch_file, batch_content)
+                .map_err(|e| {
+                    log::error!("创建临时批处理文件失败: {}, 路径: {:?}", e, batch_file);
+                    format!("创建临时批处理文件失败: {}", e)
+                })?;
+            
+            (Some(batch_file), Some(output_file), Some(error_file), Some(exit_file))
         } else {
-            let mut c = Command::new("sh");
-            c.args(["-c", &params.command]);
-            c
+            (None, None, None, None)
+        };
+        
+        let mut cmd = if cfg!(target_os = "windows") {
+            if params.sudo {
+                // 检测当前进程是否已有管理员权限
+                let is_elevated = is_elevated();
+                
+                if is_elevated {
+                    // 如果已有管理员权限，直接执行命令（不需要 UAC 提升和临时文件）
+                    let mut c = Command::new("cmd");
+                    c.args(["/C", &params.command]);
+                    // Windows 进程创建标志：
+                    // CREATE_NEW_PROCESS_GROUP = 0x00000200
+                    // CREATE_NO_WINDOW = 0x08000000
+                    c.creation_flags(0x00000200 | 0x08000000);
+                    c
+                } else {
+                    // 没有管理员权限，需要使用 UAC 提升
+                    // 使用 PowerShell 的 -WindowStyle Hidden 来隐藏窗口
+                    let batch_file = temp_batch_file.as_ref().unwrap();
+                    
+                    // 获取完整路径（避免短路径问题）
+                    let batch_file_path = match batch_file.canonicalize() {
+                        Ok(path) => path,
+                        Err(_) => {
+                            // 如果无法规范化，使用原始路径
+                            batch_file.clone()
+                        }
+                    };
+                    
+                    let batch_file_str = batch_file_path.to_string_lossy();
+                    
+                    let mut c = Command::new("powershell");
+                    // 使用 -WindowStyle Hidden 来隐藏 PowerShell 窗口
+                    let ps_command = format!(
+                        "Start-Process -FilePath \"{}\" -Verb RunAs -Wait -WindowStyle Hidden",
+                        batch_file_str.replace("\"", "\"\"")
+                    );
+                    
+                    c.args([
+                        "-NoProfile",
+                        "-NonInteractive",
+                        "-ExecutionPolicy",
+                        "Bypass",
+                        "-Command",
+                        &ps_command,
+                    ]);
+                    // Windows 进程创建标志：
+                    // CREATE_NEW_PROCESS_GROUP = 0x00000200
+                    // CREATE_NO_WINDOW = 0x08000000
+                    c.creation_flags(0x00000200 | 0x08000000);
+                    c
+                }
+            } else {
+                // Windows: 普通执行，使用 cmd /C
+                let mut c = Command::new("cmd");
+                c.args(["/C", &params.command]);
+                // Windows 进程创建标志：
+                // CREATE_NEW_PROCESS_GROUP = 0x00000200
+                // CREATE_NO_WINDOW = 0x08000000
+                c.creation_flags(0x00000200 | 0x08000000);
+                c
+            }
+        } else {
+            // Linux/macOS: 根据 sudo 标志决定是否使用 sudo
+            if params.sudo {
+                let mut c = Command::new("sudo");
+                c.args(["-S", "sh", "-c", &params.command]);
+                // sudo -S 表示从标准输入读取密码
+                // 但这里我们不提供密码输入，让系统提示用户输入
+                c
+            } else {
+                let mut c = Command::new("sh");
+                c.args(["-c", &params.command]);
+                c
+            }
         };
 
         // 设置工作目录
-        if let Some(wd) = &params.working_directory {
-            // 规范化路径，处理 Windows 反斜线和相对路径
-            let path = PathBuf::from(wd);
+        // Windows UAC 提升时（且没有管理员权限），工作目录已在批处理文件中设置，不需要在这里设置
+        // 但如果已有管理员权限，直接执行命令时，需要设置工作目录
+        #[cfg(target_os = "windows")]
+        let should_set_working_dir = !(params.sudo && !is_elevated());
+        #[cfg(not(target_os = "windows"))]
+        let should_set_working_dir = true;
+        
+        if should_set_working_dir {
+            if let Some(wd) = &params.working_directory {
+                // 规范化路径，处理 Windows 反斜线和相对路径
+                let path = PathBuf::from(wd);
 
-            // 验证路径是否存在
-            if !path.exists() {
-                return Err(format!("工作目录不存在: {}", wd));
+                // 验证路径是否存在
+                if !path.exists() {
+                    return Err(format!("工作目录不存在: {}", wd));
+                }
+
+                if !path.is_dir() {
+                    return Err(format!("工作目录路径不是目录: {}", wd));
+                }
+
+                cmd.current_dir(&path);
             }
-
-            if !path.is_dir() {
-                return Err(format!("工作目录路径不是目录: {}", wd));
+        } else {
+            // Windows UAC 提升时，仍然需要验证工作目录存在（批处理文件中会使用）
+            if let Some(wd) = &params.working_directory {
+                let path = PathBuf::from(wd);
+                if !path.exists() {
+                    return Err(format!("工作目录不存在: {}", wd));
+                }
+                if !path.is_dir() {
+                    return Err(format!("工作目录路径不是目录: {}", wd));
+                }
             }
-
-            cmd.current_dir(path);
         }
 
         // 配置输入输出
-        cmd.stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdin(Stdio::null());
+        // Windows UAC 提升时（且没有管理员权限），输出被重定向到临时文件，不需要管道
+        #[cfg(target_os = "windows")]
+        let is_using_temp_files = params.sudo && !is_elevated();
+        #[cfg(not(target_os = "windows"))]
+        let is_using_temp_files = false;
+        
+        if !is_using_temp_files {
+            cmd.stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .stdin(Stdio::null());
+        } else {
+            // UAC 提升时，输出重定向到临时文件，但 PowerShell 的输出仍需要捕获
+            cmd.stdout(Stdio::piped())
+                .stderr(Stdio::piped())
+                .stdin(Stdio::null());
+        }
 
         // 启动进程
-        let mut child = cmd.spawn().map_err(|e| format!("启动命令失败: {}", e))?;
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                log::error!("启动命令失败: {}", e);
+                return Err(format!("启动命令失败: {}", e));
+            }
+        };
 
         let pid = child.id();
 
@@ -228,6 +392,7 @@ impl CommandRunner {
                 let job = match CreateJobObjectW(None, PCWSTR::null()) {
                     Ok(handle) => handle,
                     Err(e) => {
+                        log::error!("创建 Job Object 失败: {:?}", e);
                         let _ = child.kill();
                         return Err(format!("创建 Job Object 失败: {:?}", e));
                     }
@@ -280,7 +445,30 @@ impl CommandRunner {
         // 保存命令信息
         {
             let mut infos = self.command_infos.lock().unwrap();
-            infos.insert(params.command_id, CommandInfo { params: params.clone() });
+            #[cfg(target_os = "windows")]
+            {
+                let temp_files = if params.sudo {
+                    temp_batch_file.as_ref().and_then(|bf| {
+                        temp_output_file.as_ref().and_then(|of| {
+                            temp_error_file.as_ref().and_then(|ef| {
+                                temp_exit_file.as_ref().map(|xf| {
+                                    (bf.clone(), of.clone(), ef.clone(), xf.clone())
+                                })
+                            })
+                        })
+                    })
+                } else {
+                    None
+                };
+                infos.insert(params.command_id, CommandInfo {
+                    params: params.clone(),
+                    temp_files,
+                });
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                infos.insert(params.command_id, CommandInfo { params: params.clone() });
+            }
         }
 
         // 初始化日志缓冲
@@ -290,31 +478,55 @@ impl CommandRunner {
         }
 
         // 启动日志读取线程（stdout）
-        if let Some(stdout) = stdout {
-            let command_id = params.command_id;
-            let runner = self.clone_for_thread();
-            std::thread::spawn(move || {
-                let reader = BufReader::new(stdout);
-                for line in reader.lines() {
-                    if let Ok(line) = line {
-                        runner.append_log(command_id, line, "stdout");
+        // Windows UAC 提升时，输出被重定向到临时文件，不需要读取 stdout/stderr
+        #[cfg(target_os = "windows")]
+        let is_using_temp_files = params.sudo;
+        #[cfg(not(target_os = "windows"))]
+        let is_using_temp_files = false;
+        
+        if !is_using_temp_files {
+            if let Some(stdout) = stdout {
+                let command_id = params.command_id;
+                let runner = self.clone_for_thread();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stdout);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            runner.append_log(command_id, line, "stdout");
+                        }
                     }
-                }
-            });
-        }
+                });
+            }
 
-        // 启动日志读取线程（stderr）
-        if let Some(stderr) = stderr {
-            let command_id = params.command_id;
-            let runner = self.clone_for_thread();
-            std::thread::spawn(move || {
-                let reader = BufReader::new(stderr);
-                for line in reader.lines() {
-                    if let Ok(line) = line {
-                        runner.append_log(command_id, line, "stderr");
+            // 启动日志读取线程（stderr）
+            if let Some(stderr) = stderr {
+                let command_id = params.command_id;
+                let runner = self.clone_for_thread();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            runner.append_log(command_id, line, "stderr");
+                        }
                     }
-                }
-            });
+                });
+            }
+        } else {
+            // Windows UAC 提升时，仍然需要读取 PowerShell 的输出
+            if let Some(stderr) = stderr {
+                let command_id = params.command_id;
+                let runner = self.clone_for_thread();
+                std::thread::spawn(move || {
+                    let reader = BufReader::new(stderr);
+                    for line in reader.lines() {
+                        if let Ok(line) = line {
+                            if !line.trim().is_empty() {
+                                runner.append_log(command_id, format!("[PowerShell] {}", line), "stderr");
+                            }
+                        }
+                    }
+                });
+            }
         }
 
         // 保存进程句柄
@@ -339,10 +551,26 @@ impl CommandRunner {
         // 先更新状态为 Stopped，防止监控线程覆盖状态
         self.update_state(command_id, CommandStatus::Stopped, None, None);
 
+        // 获取命令信息（用于清理临时文件）
+        #[cfg(target_os = "windows")]
+        let temp_files = {
+            let infos = self.command_infos.lock().unwrap();
+            infos.get(&command_id).and_then(|info| info.temp_files.clone())
+        };
+
         // 清理命令信息
         {
             let mut infos = self.command_infos.lock().unwrap();
             infos.remove(&command_id);
+        }
+
+        // Windows UAC 提升：清理临时文件（如果存在）
+        #[cfg(target_os = "windows")]
+        if let Some((batch_file, output_file, error_file, exit_file)) = temp_files {
+            let _ = std::fs::remove_file(batch_file);
+            let _ = std::fs::remove_file(output_file);
+            let _ = std::fs::remove_file(error_file);
+            let _ = std::fs::remove_file(exit_file);
         }
 
         // 清理日志数据
@@ -423,11 +651,36 @@ impl CommandRunner {
             }
         }
 
-        // 获取命令信息（用于通知）
+        // 获取命令信息（用于通知和临时文件清理）
         let command_info = {
             let infos = self.command_infos.lock().unwrap();
             infos.get(&command_id).cloned()
         };
+
+        // Windows UAC 提升：从临时文件读取输出
+        #[cfg(target_os = "windows")]
+        if let Some(ref info) = command_info {
+            if let Some(ref temp_files) = info.temp_files {
+                let (_, output_file, error_file, _exit_file) = temp_files;
+                
+                // 等待一下，确保文件写入完成
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                
+                // 读取 stdout
+                if let Ok(content) = std::fs::read_to_string(output_file) {
+                    for line in content.lines() {
+                        self.append_log(command_id, line.to_string(), "stdout");
+                    }
+                }
+                
+                // 读取 stderr
+                if let Ok(content) = std::fs::read_to_string(error_file) {
+                    for line in content.lines() {
+                        self.append_log(command_id, line.to_string(), "stderr");
+                    }
+                }
+            }
+        }
 
         // 移除进程句柄
         {
@@ -436,33 +689,59 @@ impl CommandRunner {
         }
 
         // 更新状态并发送通知
-        match exit_status {
+        let (final_status, exit_code) = match exit_status {
             Ok(status) => {
                 let exit_code = status.code();
-                let final_status = if status.success() {
+                
+                // Windows UAC 提升：从临时文件读取退出码
+                #[cfg(target_os = "windows")]
+                let exit_code = if let Some(ref info) = command_info {
+                    if let Some(ref temp_files) = info.temp_files {
+                        let (_, _, _, exit_file) = temp_files;
+                        if let Ok(content) = std::fs::read_to_string(exit_file) {
+                            content.trim().parse::<i32>().ok().or(exit_code)
+                        } else {
+                            exit_code
+                        }
+                    } else {
+                        exit_code
+                    }
+                } else {
+                    exit_code
+                };
+                
+                let final_status = if status.success() || exit_code == Some(0) {
                     CommandStatus::Success
                 } else {
                     CommandStatus::Failed
                 };
-
-                self.update_state(command_id, final_status.clone(), None, exit_code);
-
-                // 如果配置了通知，发送通知
-                if let Some(info) = command_info {
-                    if info.params.notification_when_finished {
-                        self.send_notification(&info.params.command_name, &final_status, exit_code);
-                    }
-                }
+                
+                (final_status, exit_code)
             }
-            Err(_) => {
-                self.update_state(command_id, CommandStatus::Failed, None, None);
+            Err(e) => {
+                log::error!("等待进程失败: {:?}", e);
+                (CommandStatus::Failed, None)
+            }
+        };
 
-                // 发送失败通知
-                if let Some(info) = command_info {
-                    if info.params.notification_when_finished {
-                        self.send_notification(&info.params.command_name, &CommandStatus::Failed, None);
-                    }
-                }
+        self.update_state(command_id, final_status.clone(), None, exit_code);
+
+        // 如果配置了通知，发送通知
+        if let Some(ref info) = command_info {
+            if info.params.notification_when_finished {
+                self.send_notification(&info.params.command_name, &final_status, exit_code);
+            }
+        }
+
+        // Windows UAC 提升：清理临时文件
+        #[cfg(target_os = "windows")]
+        if let Some(ref info) = command_info {
+            if let Some(ref temp_files) = info.temp_files {
+                let (batch_file, output_file, error_file, exit_file) = temp_files;
+                let _ = std::fs::remove_file(batch_file);
+                let _ = std::fs::remove_file(output_file);
+                let _ = std::fs::remove_file(error_file);
+                let _ = std::fs::remove_file(exit_file);
             }
         }
 
@@ -550,6 +829,7 @@ impl CommandRunner {
     }
 
     /// 检查命令是否有日志
+    #[allow(dead_code)]
     pub fn has_logs(&self, command_id: i64) -> bool {
         let logs = self.logs.lock().unwrap();
         logs.get(&command_id).map(|v| !v.is_empty()).unwrap_or(false)

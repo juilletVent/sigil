@@ -94,10 +94,24 @@ pub fn setup_tray(app: &App, window: tauri::WebviewWindow) -> Result<(), String>
                 "show" => {
                     // 切换窗口显示/隐藏
                     if let Some(window) = app.get_webview_window("main") {
-                        if window.is_visible().unwrap_or(false) {
+                        // 检查窗口是否最小化
+                        let is_minimized = window.is_minimized().unwrap_or(false);
+                        let is_visible = window.is_visible().unwrap_or(false);
+                        
+                        if is_visible && !is_minimized {
+                            // 窗口可见且未最小化，则隐藏
                             let _ = window.hide();
                         } else {
-                            let _ = window.show();
+                            // 窗口不可见或最小化，则显示并激活
+                            if is_minimized {
+                                // 如果窗口最小化，先恢复窗口
+                                let _ = window.unminimize();
+                            }
+                            // 如果窗口不可见，先显示
+                            if !is_visible {
+                                let _ = window.show();
+                            }
+                            // 激活窗口
                             let _ = window.set_focus();
                         }
                     }
@@ -116,9 +130,18 @@ pub fn setup_tray(app: &App, window: tauri::WebviewWindow) -> Result<(), String>
                     ..
                 } => {
                     // 左键单击：显示并激活窗口
+                    // 检查窗口是否最小化
+                    if window_for_tray.is_minimized().unwrap_or(false) {
+                        // 如果窗口最小化，先恢复窗口
+                        let _ = window_for_tray.unminimize();
+                    }
+                    
+                    // 如果窗口不可见，先显示
                     if !window_for_tray.is_visible().unwrap_or(false) {
                         let _ = window_for_tray.show();
                     }
+                    
+                    // 激活窗口
                     let _ = window_for_tray.set_focus();
                 }
                 _ => {}

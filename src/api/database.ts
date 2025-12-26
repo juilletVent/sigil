@@ -1,55 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
+import type {
+  Command,
+  CreateCommandParams,
+  UpdateCommandParams,
+  ImportResult,
+  CommandState,
+  CommandStatus,
+} from "../types";
+import { CONFIG_KEYS as TYPES_CONFIG_KEYS } from "../types/config";
 
-// ==================== 类型定义 ====================
-
-/**
- * 命令数据结构
- */
-export interface Command {
-  id: number;
-  name: string;
-  command: string;
-  sudo: boolean;
-  working_directory?: string;
-  url?: string;
-  notification_when_finished: boolean;
-  sort_order: number;
-  created_at: string;
-  updated_at: string;
-}
-
-/**
- * 创建命令的参数
- */
-export interface CreateCommandParams {
-  name: string;
-  command: string;
-  sudo: boolean;
-  working_directory?: string;
-  url?: string;
-  notification_when_finished: boolean;
-}
-
-/**
- * 更新命令的参数（所有字段可选）
- */
-export interface UpdateCommandParams {
-  name?: string;
-  command?: string;
-  sudo?: boolean;
-  working_directory?: string;
-  url?: string;
-  notification_when_finished?: boolean;
-}
-
-/**
- * 导入结果
- */
-export interface ImportResult {
-  success_count: number;
-  skip_count: number;
-  failed_items: Array<{ index: number; reason: string }>;
-}
+// 重新导出类型以便向后兼容
+export type {
+  Command,
+  CreateCommandParams,
+  UpdateCommandParams,
+  ImportResult,
+  CommandState,
+  CommandStatus,
+};
 
 // ==================== 命令管理 API ====================
 
@@ -161,22 +129,6 @@ export const configApi = {
 // ==================== 命令执行相关 API ====================
 
 /**
- * 命令执行状态
- */
-export type CommandStatus = "idle" | "running" | "success" | "failed" | "stopped";
-
-/**
- * 命令状态信息
- */
-export interface CommandState {
-  command_id: number;
-  status: CommandStatus;
-  pid?: number;
-  start_time?: string;
-  exit_code?: number;
-}
-
-/**
  * 命令执行相关 API
  */
 export const commandExecutionApi = {
@@ -255,9 +207,7 @@ export const autostartApi = {
 
 /**
  * 系统配置键常量
+ * @deprecated 请使用 types/config.ts 中的 CONFIG_KEYS
  */
-export const CONFIG_KEYS = {
-  AUTO_START: "auto_start",
-  LANGUAGE: "language",
-} as const;
+export const CONFIG_KEYS = TYPES_CONFIG_KEYS;
 

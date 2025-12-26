@@ -13,24 +13,12 @@ import { useTranslation } from "react-i18next";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import {
-  CommandItemContainer,
-  PlayButton,
-  StatusIcon,
-  CommandName,
-  DragHandle,
-} from "./styles";
+import { CommandItemContainer, PlayButton, StatusIcon, CommandName, DragHandle } from "./styles";
 
-export interface Command {
-  id: string;
-  name: string;
-  isRunning: boolean;
-  url?: string;
-  hasLogs?: boolean;
-}
+import type { CommandItem } from "../../types";
 
 interface CommandItemProps {
-  command: Command;
+  command: CommandItem;
   onPlay?: (id: string) => void;
   onEdit?: (id: string) => void;
   onCopy?: (id: string) => void;
@@ -38,24 +26,12 @@ interface CommandItemProps {
   onViewLogs?: (id: string) => void;
 }
 
-function CommandItem({
-  command,
-  onPlay,
-  onEdit,
-  onCopy,
-  onDelete,
-  onViewLogs,
-}: CommandItemProps) {
+function CommandItem({ command, onPlay, onEdit, onCopy, onDelete, onViewLogs }: CommandItemProps) {
   const { t } = useTranslation();
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: command.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: command.id,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -127,31 +103,23 @@ function CommandItem({
         <PlayButton
           onClick={handlePlay}
           title={
-            command.isRunning
-              ? t("components.commandItem.stop")
-              : t("components.commandItem.run")
+            command.isRunning ? t("components.commandItem.stop") : t("components.commandItem.run")
           }
           $isRunning={command.isRunning}
         >
           {command.isRunning ? <StopOutlined /> : <PlayCircleOutlined />}
         </PlayButton>
         {(command.isRunning || command.hasLogs) && (
-          <StatusIcon
-            onClick={handleViewLogs}
-            title={t("components.commandItem.viewLogs")}
-          >
+          <StatusIcon onClick={handleViewLogs} title={t("components.commandItem.viewLogs")}>
             <FileTextOutlined />
           </StatusIcon>
         )}
         {command.url && (
-          <StatusIcon
-            onClick={handleOpenUrl}
-            title={t("components.commandItem.openUrl")}
-          >
+          <StatusIcon onClick={handleOpenUrl} title={t("components.commandItem.openUrl")}>
             <LinkOutlined />
           </StatusIcon>
         )}
-        <Tooltip title={command.name} placement="top">
+        <Tooltip title={command.name} placement="topLeft">
           <CommandName>{command.name}</CommandName>
         </Tooltip>
       </CommandItemContainer>

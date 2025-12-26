@@ -16,17 +16,18 @@ import {
 import { restrictToVerticalAxis } from "@dnd-kit/modifiers";
 import { Empty } from "antd";
 import { useTranslation } from "react-i18next";
-import CommandItem, { Command } from "./CommandItem";
+import type { CommandItem } from "../../types";
+import CommandItemComponent from "./CommandItem";
 import { ListContainer, EmptyStateContainer } from "./styles";
 
 export interface CommandListProps {
-  commands: Command[];
+  commands: CommandItem[];
   onPlayCommand?: (id: string) => void;
   onEditCommand?: (id: string) => void;
   onCopyCommand?: (id: string) => void;
   onDeleteCommand?: (id: string) => void;
   onViewLogs?: (id: string) => void;
-  onReorder?: (commands: Command[]) => void;
+  onReorder?: (commands: CommandItem[]) => void;
 }
 
 function CommandList({ commands, onPlayCommand, onEditCommand, onCopyCommand, onDeleteCommand, onViewLogs, onReorder }: CommandListProps) {
@@ -79,7 +80,7 @@ function CommandList({ commands, onPlayCommand, onEditCommand, onCopyCommand, on
       >
         <ListContainer>
           {commands.map((command) => (
-            <CommandItem
+            <CommandItemComponent
               key={command.id}
               command={command}
               onPlay={onPlayCommand}

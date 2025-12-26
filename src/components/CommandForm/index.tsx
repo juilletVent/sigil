@@ -7,16 +7,8 @@ import {
 } from "@ant-design/icons";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
+import type { CommandFormValues } from "../../types";
 import { FormContainer, ButtonGroup } from "./styles";
-
-export interface CommandFormValues {
-  name: string;
-  command: string;
-  sudo?: boolean;
-  workingDirectory?: string;
-  url?: string;
-  notificationWhenFinished?: boolean;
-}
 
 interface CommandFormProps {
   initialValues?: Partial<CommandFormValues>;

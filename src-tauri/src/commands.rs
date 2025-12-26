@@ -1,5 +1,6 @@
 use crate::autostart;
 use crate::command_runner::{CommandRunner, CommandState, ExecuteCommandParams};
+use crate::constants;
 use crate::db::{self, CreateCommandInput, Database, UpdateCommandInput};
 use crate::i18n::{get_language_from_db, Translations};
 use crate::monitor::{DiskInfo, DiskMonitorState, MonitorState, SystemInfo};
@@ -120,7 +121,7 @@ pub fn set_system_config(
     database.set_config(&key, &value)?;
     
     // 如果设置的是语言配置，广播语言变化事件到所有窗口
-    if key == "language" {
+    if key == constants::config_keys::LANGUAGE {
         let _ = app.emit_to(EventTarget::Any, "language-changed", value);
     }
     
@@ -396,21 +397,46 @@ pub async fn update_log_window_title(
 pub fn enable_autostart(app: AppHandle, database: State<Database>) -> Result<(), String> {
     let language = get_language_from_db(database.inner());
     
-    // 获取应用名称（从 productName 或使用默认值）
-    let app_name = "sigil";
+    // 获取应用名称
+    let app_name = constants::APP_NAME;
     
-    // 获取应用可执行文件路径
-    let app_path = app
-        .path()
-        .resolve("sigil.exe", tauri::path::BaseDirectory::Executable)
-        .or_else(|_| {
-            // Fallback 到 env::current_exe()
-            std::env::current_exe()
-                .map_err(|e| Translations::autostart_get_path_failed(language, &e.to_string()))
-        })
-        .map_err(|e| e)?
-        .to_string_lossy()
-        .to_string();
+    // 获取应用可执行文件路径（多个fallback策略）
+    let app_path = {
+        // 策略1: 尝试从Tauri的Executable目录获取
+        let path1 = app
+            .path()
+            .resolve("sigil.exe", tauri::path::BaseDirectory::Executable);
+        
+        // 策略2: 尝试从当前可执行文件获取
+        let path2 = std::env::current_exe();
+        
+        // 策略3: 尝试从Tauri的Resource目录获取（分发场景）
+        let path3 = app
+            .path()
+            .resolve("sigil.exe", tauri::path::BaseDirectory::Resource);
+        
+        // 按优先级尝试
+        path1
+            .or_else(|_| path2)
+            .or_else(|_| path3)
+            .map_err(|e| {
+                // 如果所有策略都失败，返回详细错误信息
+                Translations::autostart_get_path_failed(
+                    language,
+                    &format!("无法获取应用路径: {}", e),
+                )
+            })?
+            .to_string_lossy()
+            .to_string()
+    };
+    
+    // 验证路径是否存在
+    if !std::path::Path::new(&app_path).exists() {
+        return Err(Translations::autostart_get_path_failed(
+            language,
+            &format!("应用路径不存在: {}", app_path),
+        ));
+    }
     
     // 启用自启动
     autostart::enable_autostart(app_name, &app_path)
@@ -425,7 +451,7 @@ pub fn disable_autostart(_app: AppHandle, database: State<Database>) -> Result<(
     let language = get_language_from_db(database.inner());
     
     // 获取应用名称
-    let app_name = "sigil";
+    let app_name = constants::APP_NAME;
     
     // 禁用自启动
     autostart::disable_autostart(app_name)
@@ -438,9 +464,49 @@ pub fn disable_autostart(_app: AppHandle, database: State<Database>) -> Result<(
 #[tauri::command]
 pub fn check_autostart_status(_app: AppHandle, _database: State<Database>) -> Result<bool, String> {
     // 获取应用名称
-    let app_name = "sigil";
+    let app_name = constants::APP_NAME;
     
     // 检查自启动状态
     autostart::is_autostart_enabled(app_name)
+}
+
+// ==================== 开发者工具相关命令 ====================
+
+/// 打开开发者工具
+#[tauri::command]
+pub fn open_devtools(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.open_devtools();
+        Ok(())
+    } else {
+        Err("找不到主窗口".to_string())
+    }
+}
+
+/// 关闭开发者工具
+#[tauri::command]
+pub fn close_devtools(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        window.close_devtools();
+        Ok(())
+    } else {
+        Err("找不到主窗口".to_string())
+    }
+}
+
+/// 切换开发者工具
+#[tauri::command]
+pub fn toggle_devtools(app: AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("main") {
+        // 检查开发者工具是否已打开
+        if window.is_devtools_open() {
+            window.close_devtools();
+        } else {
+            window.open_devtools();
+        }
+        Ok(())
+    } else {
+        Err("找不到主窗口".to_string())
+    }
 }
 

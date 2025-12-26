@@ -1,7 +1,241 @@
-# Tauri + React + Typescript
+# Sigil
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+<div align="center">
 
-## Recommended IDE Setup
+![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+一个基于 Tauri 构建的现代化桌面应用程序，旨在简化命令行工具的管理和执行过程。
+
+[功能特性](#功能特性) • [快速开始](#快速开始) • [开发指南](#开发指南) • [贡献](#贡献)
+
+</div>
+
+## 功能特性
+
+- 🚀 **命令管理**: 创建、编辑、删除和排序命令行工具
+- 📊 **实时监控**: 查看命令执行状态和实时日志输出
+- 🔄 **系统集成**: 支持开机自启动、系统托盘等功能
+- 🌐 **多语言支持**: 支持简体中文和英文
+- 🎨 **现代化 UI**: 基于 Ant Design 的美观界面，支持深色模式
+- 🔒 **安全可靠**: 严格的 CSP 策略，确保应用安全
+
+## 技术栈
+
+### 前端
+- **React 19** - 用户界面框架
+- **TypeScript** - 类型安全
+- **Ant Design 6** - UI 组件库
+- **Styled Components** - CSS-in-JS 样式方案
+- **React Router 7** - 路由管理
+- **i18next** - 国际化支持
+
+### 后端
+- **Rust** - 系统级编程语言
+- **Tauri 2** - 轻量级桌面应用框架
+- **SQLite** - 本地数据库存储
+- **sysinfo** - 系统信息监控
+
+## 快速开始
+
+### 环境要求
+
+- **Node.js** >= 18.0.0
+- **pnpm** >= 8.0.0（推荐）或 npm/yarn
+- **Rust** >= 1.70.0
+- **Windows** 10/11（当前版本）
+
+### 安装依赖
+
+```bash
+# 使用 pnpm（推荐）
+pnpm install
+
+# 或使用 npm
+npm install
+
+# 或使用 yarn
+yarn install
+```
+
+### 开发模式
+
+```bash
+# 启动开发服务器
+pnpm dev
+
+# 或使用 Tauri CLI
+pnpm tauri dev
+```
+
+### 构建应用
+
+```bash
+# 构建生产版本
+pnpm build
+pnpm tauri build
+
+# 构建产物位于 src-tauri/target/release/bundle/
+```
+
+## 项目结构
+
+```
+sigil/
+├── src/                    # 前端源代码
+│   ├── api/               # API 接口
+│   ├── components/        # React 组件
+│   ├── constants/         # 常量定义
+│   ├── hooks/             # React Hooks
+│   ├── i18n/              # 国际化配置
+│   ├── pages/             # 页面组件
+│   ├── services/          # 业务逻辑服务
+│   ├── types/             # TypeScript 类型定义
+│   └── utils/             # 工具函数
+├── src-tauri/             # Tauri 后端
+│   ├── src/               # Rust 源代码
+│   ├── icons/             # 应用图标
+│   └── tauri.conf.json    # Tauri 配置文件
+├── public/                # 静态资源
+└── dist/                  # 构建输出
+```
+
+## 开发指南
+
+### 代码规范
+
+项目使用 ESLint 和 Prettier 进行代码格式化：
+
+```bash
+# 检查代码规范
+pnpm lint
+
+# 自动修复
+pnpm lint:fix
+
+# 格式化代码
+pnpm format
+
+# 检查格式
+pnpm format:check
+```
+
+### 运行测试
+
+#### 前端测试
+
+```bash
+# 运行所有测试
+pnpm test
+
+# 运行测试并查看覆盖率
+pnpm test:coverage
+
+# 使用 UI 模式运行测试
+pnpm test:ui
+```
+
+#### Rust 测试
+
+```bash
+# 进入 Tauri 目录
+cd src-tauri
+
+# 运行所有 Rust 测试
+cargo test
+
+# 运行特定测试
+cargo test test_create_command
+
+# 运行测试并显示输出
+cargo test -- --nocapture
+
+# 运行测试（详细输出）
+cargo test -- --show-output
+```
+
+或者从项目根目录运行：
+
+```bash
+# 从项目根目录运行 Rust 测试
+cd src-tauri && cargo test
+```
+
+### 添加新功能
+
+1. 从 `main` 分支创建新分支
+2. 实现功能并添加测试
+3. 确保所有测试通过
+4. 提交代码并创建 Pull Request
+
+更多详细信息请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## 使用说明
+
+### 创建命令
+
+1. 点击工具栏的"添加"按钮
+2. 填写命令名称和命令内容
+3. 可选择是否需要 sudo 权限
+4. 可选择执行完成时是否显示通知
+5. 点击"保存"完成创建
+
+### 执行命令
+
+- 点击命令项右侧的"播放"按钮执行命令
+- 执行过程中可以点击"停止"按钮终止命令
+- 点击"日志"按钮查看命令执行日志
+
+### 系统设置
+
+在系统设置页面可以：
+- 配置开机自启动
+- 切换界面语言（中文/英文）
+
+## 构建和发布
+
+### 本地构建
+
+```bash
+# 构建 Windows 安装包
+pnpm tauri build
+
+# 构建产物：
+# - Windows: src-tauri/target/release/bundle/nsis/sigil_0.1.0_x64-setup.exe
+# - MSI: src-tauri/target/release/bundle/msi/sigil_0.1.0_x64_en-US.msi
+```
+
+### CI/CD
+
+项目配置了 GitHub Actions 和 GitLab CI，支持：
+- 自动运行测试
+- 代码检查（lint）
+- 自动构建 Windows 应用
+- 自动发布到 GitHub Releases 和 GitLab Release（基于 git tag）
+
+## 贡献
+
+欢迎贡献代码！请阅读 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详细信息。
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE) 许可证。
+
+## 更新日志
+
+查看 [CHANGELOG.md](CHANGELOG.md) 了解版本更新历史。
+
+## 相关链接
+
+- [Tauri 文档](https://tauri.app/)
+- [React 文档](https://react.dev/)
+- [Ant Design 文档](https://ant.design/)
+
+---
+
+<div align="center">
+
+Made with ❤️ by Sigil Contributors
+
+</div>

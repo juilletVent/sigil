@@ -2,6 +2,7 @@ use rusqlite::{params, Connection, OptionalExtension, Result as SqliteResult};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::Manager;
+use crate::constants;
 
 // ==================== 数据结构定义 ====================
 
@@ -50,27 +51,80 @@ pub struct Database {
 }
 
 impl Database {
+    /// 获取程序运行目录（可执行文件所在目录）
+    fn get_app_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+        // 策略1: 尝试从Tauri的Executable目录获取
+        if let Ok(exe_path) = app_handle
+            .path()
+            .resolve("sigil.exe", tauri::path::BaseDirectory::Executable)
+        {
+            if let Some(parent) = exe_path.parent() {
+                return Ok(parent.to_path_buf());
+            }
+        }
+
+        // 策略2: 尝试从当前可执行文件获取
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(parent) = exe_path.parent() {
+                return Ok(parent.to_path_buf());
+            }
+        }
+
+        // 策略3: 尝试从Tauri的Resource目录获取（分发场景）
+        if let Ok(resource_path) = app_handle
+            .path()
+            .resolve("sigil.exe", tauri::path::BaseDirectory::Resource)
+        {
+            if let Some(parent) = resource_path.parent() {
+                return Ok(parent.to_path_buf());
+            }
+        }
+
+        Err("无法获取程序运行目录".to_string())
+    }
+
     /// 初始化数据库
     pub fn init(app_handle: &tauri::AppHandle) -> Result<Self, String> {
-        // 获取应用数据目录
-        let app_data_dir = app_handle
-            .path()
-            .app_data_dir()
-            .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+        // 获取程序运行目录（可执行文件所在目录）
+        let app_dir = Self::get_app_dir(app_handle)?;
 
-        // 确保目录存在
-        std::fs::create_dir_all(&app_data_dir)
-            .map_err(|e| format!("创建应用数据目录失败: {}", e))?;
+        // 确保目录存在（递归创建所有必要的父目录）
+        std::fs::create_dir_all(&app_dir).map_err(|e| {
+            format!(
+                "创建程序运行目录失败: {}。路径: {:?}。请检查文件系统权限。",
+                e, app_dir
+            )
+        })?;
+
+        // 验证目录是否可写
+        let test_file = app_dir.join(".write_test");
+        if let Err(e) = std::fs::write(&test_file, b"test") {
+            return Err(format!(
+                "程序运行目录不可写: {}。路径: {:?}。请检查文件系统权限。",
+                e, app_dir
+            ));
+        }
+        // 清理测试文件
+        let _ = std::fs::remove_file(&test_file);
 
         // 数据库文件路径
-        let db_path = app_data_dir.join("sigil.db");
+        let db_path = app_dir.join(constants::DB_FILE_NAME);
         
-        // 连接数据库
-        let conn = Connection::open(&db_path)
-            .map_err(|e| format!("打开数据库失败: {}", e))?;
+        // 连接数据库（如果文件不存在会自动创建）
+        let conn = Connection::open(&db_path).map_err(|e| {
+            format!(
+                "打开数据库失败: {}。路径: {:?}。请确保有足够的磁盘空间和文件系统权限。",
+                e, db_path
+            )
+        })?;
 
-        // 创建表
-        Self::create_tables(&conn)?;
+        // 创建表（如果不存在）
+        Self::create_tables(&conn).map_err(|e| {
+            format!(
+                "创建数据库表失败: {}。这可能是数据库文件损坏导致的。",
+                e
+            )
+        })?;
 
         Ok(Database {
             conn: Mutex::new(conn),
@@ -78,7 +132,7 @@ impl Database {
     }
 
     /// 创建数据库表
-    fn create_tables(conn: &Connection) -> Result<(), String> {
+    pub(crate) fn create_tables(conn: &Connection) -> Result<(), String> {
         // 创建命令表
         conn.execute(
             "CREATE TABLE IF NOT EXISTS commands (
@@ -352,6 +406,14 @@ impl Database {
             .map_err(|e| format!("收集查询结果失败: {}", e))?;
 
         Ok(configs)
+    }
+
+    #[cfg(test)]
+    /// 创建测试数据库（仅用于测试）
+    pub fn new_for_testing(conn: Connection) -> Self {
+        Database {
+            conn: Mutex::new(conn),
+        }
     }
 }
 

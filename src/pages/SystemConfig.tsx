@@ -3,7 +3,8 @@ import { Checkbox, Radio, message } from "antd";
 import styled from "styled-components";
 import { useTranslation } from "react-i18next";
 import SecondaryNavBar from "../components/SecondaryNavBar";
-import { configApi, CONFIG_KEYS, autostartApi } from "../api/database";
+import { configApi, autostartApi } from "../api/database";
+import { CONFIG_KEYS } from "../types/config";
 
 // ==================== 样式组件 ====================
 
@@ -73,21 +74,45 @@ function SystemConfig() {
     try {
       // 加载开机自启动配置
       const autoStartValue = await configApi.get(CONFIG_KEYS.AUTO_START);
-      const configEnabled = autoStartValue === "true";
       
-      // 检查实际的自启动状态（注册表状态）
-      try {
-        const actualStatus = await autostartApi.checkStatus();
-        // 如果配置和实际状态不一致，以实际状态为准
-        setAutoStart(actualStatus);
-        // 如果配置值与实际状态不一致，更新配置
-        if (configEnabled !== actualStatus) {
-          await configApi.set(CONFIG_KEYS.AUTO_START, String(actualStatus));
-        }
-      } catch (error) {
-        // 如果检查失败，使用配置值
-        console.error("Failed to check autostart status:", error);
+      // 如果数据库中有配置值，优先使用数据库配置（用户明确设置的值）
+      if (autoStartValue !== null) {
+        const configEnabled = autoStartValue === "true";
         setAutoStart(configEnabled);
+        
+        // 同步注册表状态，确保注册表状态与数据库配置一致
+        try {
+          const actualStatus = await autostartApi.checkStatus();
+          if (configEnabled !== actualStatus) {
+            // 如果注册表状态与数据库配置不一致，同步注册表状态
+            if (configEnabled) {
+              await autostartApi.enable();
+            } else {
+              try {
+                await autostartApi.disable();
+              } catch (disableError) {
+                // 禁用失败时，忽略错误（可能是注册表中不存在该项）
+                console.warn("Failed to sync autostart status (ignored):", disableError);
+              }
+            }
+          }
+        } catch (error) {
+          // 如果检查失败，忽略（不影响UI显示）
+          console.warn("Failed to check autostart status for sync (ignored):", error);
+        }
+      } else {
+        // 如果数据库中没有配置值，检查注册表状态作为默认值
+        try {
+          const actualStatus = await autostartApi.checkStatus();
+          setAutoStart(actualStatus);
+          // 将注册表状态保存到数据库
+          await configApi.set(CONFIG_KEYS.AUTO_START, String(actualStatus));
+        } catch (error) {
+          // 如果检查失败，默认禁用
+          console.error("Failed to check autostart status:", error);
+          setAutoStart(false);
+          await configApi.set(CONFIG_KEYS.AUTO_START, "false");
+        }
       }
 
       // 加载语言配置
