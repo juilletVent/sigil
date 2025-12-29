@@ -51,47 +51,29 @@ pub struct Database {
 }
 
 impl Database {
-    /// 获取程序运行目录（可执行文件所在目录）
-    fn get_app_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-        // 策略1: 尝试从Tauri的Executable目录获取
-        if let Ok(exe_path) = app_handle
+    /// 获取应用数据目录（LocalAppData下的应用子目录）
+    fn get_app_data_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+        // 获取LocalAppData目录下的应用子目录
+        let app_data_dir = app_handle
             .path()
-            .resolve("sigil.exe", tauri::path::BaseDirectory::Executable)
-        {
-            if let Some(parent) = exe_path.parent() {
-                return Ok(parent.to_path_buf());
-            }
-        }
-
-        // 策略2: 尝试从当前可执行文件获取
-        if let Ok(exe_path) = std::env::current_exe() {
-            if let Some(parent) = exe_path.parent() {
-                return Ok(parent.to_path_buf());
-            }
-        }
-
-        // 策略3: 尝试从Tauri的Resource目录获取（分发场景）
-        if let Ok(resource_path) = app_handle
-            .path()
-            .resolve("sigil.exe", tauri::path::BaseDirectory::Resource)
-        {
-            if let Some(parent) = resource_path.parent() {
-                return Ok(parent.to_path_buf());
-            }
-        }
-
-        Err("无法获取程序运行目录".to_string())
+            .resolve("", tauri::path::BaseDirectory::AppLocalData)
+            .map_err(|e| format!("无法获取应用数据目录: {}", e))?;
+        
+        // 创建应用特定的子目录
+        let app_dir = app_data_dir.join(constants::APP_NAME);
+        
+        Ok(app_dir)
     }
 
     /// 初始化数据库
     pub fn init(app_handle: &tauri::AppHandle) -> Result<Self, String> {
-        // 获取程序运行目录（可执行文件所在目录）
-        let app_dir = Self::get_app_dir(app_handle)?;
+        // 获取应用数据目录（LocalAppData下的应用子目录）
+        let app_dir = Self::get_app_data_dir(app_handle)?;
 
         // 确保目录存在（递归创建所有必要的父目录）
         std::fs::create_dir_all(&app_dir).map_err(|e| {
             format!(
-                "创建程序运行目录失败: {}。路径: {:?}。请检查文件系统权限。",
+                "创建应用数据目录失败: {}。路径: {:?}。请检查文件系统权限。",
                 e, app_dir
             )
         })?;
@@ -100,7 +82,7 @@ impl Database {
         let test_file = app_dir.join(".write_test");
         if let Err(e) = std::fs::write(&test_file, b"test") {
             return Err(format!(
-                "程序运行目录不可写: {}。路径: {:?}。请检查文件系统权限。",
+                "应用数据目录不可写: {}。路径: {:?}。请检查文件系统权限。",
                 e, app_dir
             ));
         }

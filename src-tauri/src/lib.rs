@@ -80,16 +80,19 @@ pub fn run() {
                         use std::ffi::OsStr;
                         use std::os::windows::ffi::OsStrExt;
                         
-                        // 获取程序运行目录路径用于显示
-                        let app_dir = std::env::current_exe()
+                        // 获取应用数据目录路径用于显示
+                        let app_data_dir = app
+                            .handle()
+                            .path()
+                            .resolve("", tauri::path::BaseDirectory::AppLocalData)
                             .ok()
-                            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
+                            .map(|p| p.join(crate::constants::APP_NAME))
                             .map(|p| format!("{:?}", p))
                             .unwrap_or_else(|| "未知".to_string());
                         
                         let msg_text = format!(
-                            "{}\n\n应用将无法正常使用。\n\n请检查：\n1. 是否有足够的磁盘空间\n2. 是否有文件系统权限\n3. 程序运行目录是否可写\n\n程序运行目录: {}\n\n错误详情已记录到日志文件。",
-                            error_msg, app_dir
+                            "{}\n\n应用将无法正常使用。\n\n请检查：\n1. 是否有足够的磁盘空间\n2. 是否有文件系统权限\n3. 应用数据目录是否可写\n\n应用数据目录: {}\n\n错误详情已记录到日志文件。",
+                            error_msg, app_data_dir
                         );
                         
                         let msg: Vec<u16> = OsStr::new(&msg_text)
