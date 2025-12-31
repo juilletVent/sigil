@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams } from "react-router";
 import styled from "styled-components";
-import { Button, Modal, message, Empty } from "antd";
+import { Button, message, Empty } from "antd";
 import {
   DeleteOutlined,
   VerticalAlignTopOutlined,
@@ -106,20 +106,25 @@ function CommandLog() {
   // 监听语言变化事件（从其他窗口广播）
   useEffect(() => {
     let unlistenFn: (() => void) | null = null;
+    let cancelled = false;
 
-    const setupLanguageListener = async () => {
-      unlistenFn = await listen<string>("language-changed", async (event) => {
-        const newLanguage = event.payload;
-        // 更新当前窗口的 i18n 语言
-        i18n.changeLanguage(newLanguage);
-      });
-    };
-
-    setupLanguageListener();
+    const unlistenPromise = listen<string>("language-changed", async (event) => {
+      const newLanguage = event.payload;
+      i18n.changeLanguage(newLanguage);
+    }).then((fn) => {
+      unlistenFn = fn;
+      if (cancelled) {
+        fn();
+      }
+      return fn;
+    });
 
     return () => {
+      cancelled = true;
       if (unlistenFn) {
         unlistenFn();
+      } else {
+        unlistenPromise.then((fn) => fn());
       }
     };
   }, [i18n]);
@@ -177,26 +182,30 @@ function CommandLog() {
   // 监听实时日志更新
   useEffect(() => {
     let unlistenFn: (() => void) | null = null;
+    let cancelled = false;
 
-    const setupListener = async () => {
-      unlistenFn = await listen<LogLine>("command-log-update", (event) => {
-        const logLine = event.payload;
-        if (commandId && logLine.command_id === parseInt(commandId)) {
-          // 在更新日志之前，先检查当前是否在底部
-          if (logContentRef.current) {
-            wasAtBottomRef.current = isAtBottom(logContentRef.current);
-          }
-          const formattedLine = `[${logLine.stream}] ${logLine.line}`;
-          setLogs((prev) => [...prev, formattedLine]);
+    const unlistenPromise = listen<LogLine>("command-log-update", (event) => {
+      const logLine = event.payload;
+      if (commandId && logLine.command_id === parseInt(commandId)) {
+        if (logContentRef.current) {
+          wasAtBottomRef.current = isAtBottom(logContentRef.current);
         }
-      });
-    };
-
-    setupListener();
+        setLogs((prev) => [...prev, logLine.line]);
+      }
+    }).then((fn) => {
+      unlistenFn = fn;
+      if (cancelled) {
+        fn();
+      }
+      return fn;
+    });
 
     return () => {
+      cancelled = true;
       if (unlistenFn) {
         unlistenFn();
+      } else {
+        unlistenPromise.then((fn) => fn());
       }
     };
   }, [commandId]);
@@ -286,21 +295,18 @@ function CommandLog() {
 
   // 清空日志
   const handleClearLogs = () => {
-    Modal.confirm({
-      title: t("pages.commandLog.clearLogsConfirm"),
-      onOk: async () => {
-        try {
-          if (commandId) {
-            await commandExecutionApi.clearLogs(parseInt(commandId));
-            setLogs([]);
-            message.success(t("pages.commandLog.clearSuccess"));
-          }
-        } catch (error) {
-          console.error(t("pages.commandLog.clearFailed"), error);
-          message.error(t("pages.commandLog.clearFailed"));
+    (async () => {
+      try {
+        if (commandId) {
+          await commandExecutionApi.clearLogs(parseInt(commandId));
+          setLogs([]);
+          message.success(t("pages.commandLog.clearSuccess"));
         }
-      },
-    });
+      } catch (error) {
+        console.error(t("pages.commandLog.clearFailed"), error);
+        message.error(t("pages.commandLog.clearFailed"));
+      }
+    })();
   };
 
   // 判断是否是错误日志

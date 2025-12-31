@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::io::{BufRead, BufReader};
+use std::collections::{HashMap, HashSet};
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -13,6 +13,10 @@ use std::os::windows::process::CommandExt;
 use windows::core::PCWSTR;
 #[cfg(target_os = "windows")]
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
+#[cfg(target_os = "windows")]
+use windows::Win32::Globalization::{
+    GetOEMCP, MultiByteToWideChar, MULTI_BYTE_TO_WIDE_CHAR_FLAGS,
+};
 #[cfg(target_os = "windows")]
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
@@ -123,9 +127,23 @@ pub struct CommandRunner {
     processes: Arc<Mutex<HashMap<i64, Child>>>,
     command_infos: Arc<Mutex<HashMap<i64, CommandInfo>>>,
     logs: Arc<Mutex<HashMap<i64, Vec<String>>>>,
+    starting: Arc<Mutex<HashSet<i64>>>,
     #[cfg(target_os = "windows")]
     job_objects: Arc<Mutex<HashMap<i64, JobHandle>>>,
     app_handle: AppHandle,
+}
+
+struct StartingGuard {
+    command_id: i64,
+    starting: Arc<Mutex<HashSet<i64>>>,
+}
+
+impl Drop for StartingGuard {
+    fn drop(&mut self) {
+        if let Ok(mut set) = self.starting.lock() {
+            set.remove(&self.command_id);
+        }
+    }
 }
 
 impl CommandRunner {
@@ -136,6 +154,7 @@ impl CommandRunner {
             processes: Arc::new(Mutex::new(HashMap::new())),
             command_infos: Arc::new(Mutex::new(HashMap::new())),
             logs: Arc::new(Mutex::new(HashMap::new())),
+            starting: Arc::new(Mutex::new(HashSet::new())),
             #[cfg(target_os = "windows")]
             job_objects: Arc::new(Mutex::new(HashMap::new())),
             app_handle,
@@ -188,6 +207,18 @@ impl CommandRunner {
 
     /// 执行命令
     pub fn execute(&self, params: ExecuteCommandParams) -> Result<(), String> {
+        let _starting_guard = {
+            let mut set = self.starting.lock().unwrap();
+            if set.contains(&params.command_id) {
+                return Err("命令正在启动中".to_string());
+            }
+            set.insert(params.command_id);
+            StartingGuard {
+                command_id: params.command_id,
+                starting: Arc::clone(&self.starting),
+            }
+        };
+
         // 检查命令是否已在运行
         {
             let states = self.states.lock().unwrap();
@@ -202,8 +233,10 @@ impl CommandRunner {
         // Windows UAC 提升需要使用临时批处理文件来捕获输出
         // 但如果当前进程已有管理员权限，则不需要临时文件
         #[cfg(target_os = "windows")]
+        let elevated = if params.sudo { is_elevated() } else { false };
+        #[cfg(target_os = "windows")]
         let (temp_batch_file, temp_output_file, temp_error_file, temp_exit_file) =
-            if params.sudo && !is_elevated() {
+            if params.sudo && !elevated {
                 // 创建临时文件用于 UAC 提升执行
                 let temp_dir = std::env::temp_dir();
                 let file_prefix = format!("sigil_cmd_{}", params.command_id);
@@ -260,10 +293,7 @@ impl CommandRunner {
 
         let mut cmd = if cfg!(target_os = "windows") {
             if params.sudo {
-                // 检测当前进程是否已有管理员权限
-                let is_elevated = is_elevated();
-
-                if is_elevated {
+                if elevated {
                     // 如果已有管理员权限，直接执行命令（不需要 UAC 提升和临时文件）
                     let mut c = Command::new("cmd");
                     c.args(["/C", &params.command]);
@@ -338,7 +368,7 @@ impl CommandRunner {
         // Windows UAC 提升时（且没有管理员权限），工作目录已在批处理文件中设置，不需要在这里设置
         // 但如果已有管理员权限，直接执行命令时，需要设置工作目录
         #[cfg(target_os = "windows")]
-        let should_set_working_dir = !(params.sudo && !is_elevated());
+        let should_set_working_dir = !(params.sudo && !elevated);
         #[cfg(not(target_os = "windows"))]
         let should_set_working_dir = true;
 
@@ -398,7 +428,7 @@ impl CommandRunner {
         // 配置输入输出
         // Windows UAC 提升时（且没有管理员权限），输出被重定向到临时文件，不需要管道
         #[cfg(target_os = "windows")]
-        let is_using_temp_files = params.sudo && !is_elevated();
+        let is_using_temp_files = params.sudo && !elevated;
         #[cfg(not(target_os = "windows"))]
         let is_using_temp_files = false;
 
@@ -533,7 +563,7 @@ impl CommandRunner {
         // 启动日志读取线程（stdout）
         // Windows UAC 提升时，输出被重定向到临时文件，不需要读取 stdout/stderr
         #[cfg(target_os = "windows")]
-        let is_using_temp_files = params.sudo;
+        let is_using_temp_files = params.sudo && !elevated;
         #[cfg(not(target_os = "windows"))]
         let is_using_temp_files = false;
 
@@ -542,12 +572,7 @@ impl CommandRunner {
                 let command_id = params.command_id;
                 let runner = self.clone_for_thread();
                 std::thread::spawn(move || {
-                    let reader = BufReader::new(stdout);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            runner.append_log(command_id, line, "stdout");
-                        }
-                    }
+                    runner.read_stream_to_logs(command_id, stdout, "stdout", None);
                 });
             }
 
@@ -556,12 +581,7 @@ impl CommandRunner {
                 let command_id = params.command_id;
                 let runner = self.clone_for_thread();
                 std::thread::spawn(move || {
-                    let reader = BufReader::new(stderr);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            runner.append_log(command_id, line, "stderr");
-                        }
-                    }
+                    runner.read_stream_to_logs(command_id, stderr, "stderr", None);
                 });
             }
         } else {
@@ -570,18 +590,12 @@ impl CommandRunner {
                 let command_id = params.command_id;
                 let runner = self.clone_for_thread();
                 std::thread::spawn(move || {
-                    let reader = BufReader::new(stderr);
-                    for line in reader.lines() {
-                        if let Ok(line) = line {
-                            if !line.trim().is_empty() {
-                                runner.append_log(
-                                    command_id,
-                                    format!("[PowerShell] {}", line),
-                                    "stderr",
-                                );
-                            }
-                        }
-                    }
+                    runner.read_stream_to_logs(
+                        command_id,
+                        stderr,
+                        "stderr",
+                        Some("[PowerShell] "),
+                    );
                 });
             }
         }
@@ -726,16 +740,18 @@ impl CommandRunner {
                 std::thread::sleep(std::time::Duration::from_millis(100));
 
                 // 读取 stdout
-                if let Ok(content) = std::fs::read_to_string(output_file) {
-                    for line in content.lines() {
-                        self.append_log(command_id, line.to_string(), "stdout");
+                if let Ok(bytes) = std::fs::read(output_file) {
+                    for line_bytes in split_output_lines(&bytes) {
+                        let line = decode_output_bytes(&line_bytes);
+                        self.append_log(command_id, line, "stdout");
                     }
                 }
 
                 // 读取 stderr
-                if let Ok(content) = std::fs::read_to_string(error_file) {
-                    for line in content.lines() {
-                        self.append_log(command_id, line.to_string(), "stderr");
+                if let Ok(bytes) = std::fs::read(error_file) {
+                    for line_bytes in split_output_lines(&bytes) {
+                        let line = decode_output_bytes(&line_bytes);
+                        self.append_log(command_id, line, "stderr");
                     }
                 }
             }
@@ -853,6 +869,7 @@ impl CommandRunner {
             processes: Arc::clone(&self.processes),
             command_infos: Arc::clone(&self.command_infos),
             logs: Arc::clone(&self.logs),
+            starting: Arc::clone(&self.starting),
             #[cfg(target_os = "windows")]
             job_objects: Arc::clone(&self.job_objects),
             app_handle: self.app_handle.clone(),
@@ -861,24 +878,68 @@ impl CommandRunner {
 
     /// 追加日志行
     fn append_log(&self, command_id: i64, line: String, stream: &str) {
+        let line = line.trim_end_matches(['\r', '\n']).to_string();
+        if line.trim().is_empty() {
+            return;
+        }
+        let formatted_line = format!("[{}] {}", stream, line);
         // 追加到日志缓冲
         {
             let mut logs = self.logs.lock().unwrap();
             if let Some(log_vec) = logs.get_mut(&command_id) {
-                let formatted_line = format!("[{}] {}", stream, line);
-                log_vec.push(formatted_line);
+                log_vec.push(formatted_line.clone());
             }
         }
 
         // 发送日志更新事件（广播到所有窗口）
         let log_line = LogLine {
             command_id,
-            line,
+            line: formatted_line,
             stream: stream.to_string(),
         };
         let _ = self
             .app_handle
             .emit_to(EventTarget::Any, "command-log-update", log_line);
+    }
+
+    fn read_stream_to_logs<R: Read>(
+        &self,
+        command_id: i64,
+        mut reader: R,
+        stream: &str,
+        line_prefix: Option<&'static str>,
+    ) {
+        let mut buffer = [0u8; 4096];
+        let mut pending: Vec<u8> = Vec::new();
+
+        loop {
+            match reader.read(&mut buffer) {
+                Ok(0) => break,
+                Ok(n) => {
+                    pending.extend_from_slice(&buffer[..n]);
+                    for line_bytes in drain_pending_lines(&mut pending) {
+                        let mut line = decode_output_bytes(&line_bytes);
+                        if let Some(prefix) = line_prefix {
+                            if !line.trim().is_empty() {
+                                line = format!("{}{}", prefix, line);
+                            }
+                        }
+                        self.append_log(command_id, line, stream);
+                    }
+                }
+                Err(_) => break,
+            }
+        }
+
+        if !pending.is_empty() {
+            let mut line = decode_output_bytes(&pending);
+            if let Some(prefix) = line_prefix {
+                if !line.trim().is_empty() {
+                    line = format!("{}{}", prefix, line);
+                }
+            }
+            self.append_log(command_id, line, stream);
+        }
     }
 
     /// 获取命令日志
@@ -902,5 +963,103 @@ impl CommandRunner {
         logs.get(&command_id)
             .map(|v| !v.is_empty())
             .unwrap_or(false)
+    }
+}
+
+fn find_line_ending(bytes: &[u8]) -> Option<(usize, usize)> {
+    for (idx, b) in bytes.iter().enumerate() {
+        if *b == b'\n' {
+            return Some((idx, 1));
+        }
+        if *b == b'\r' {
+            if idx + 1 < bytes.len() && bytes[idx + 1] == b'\n' {
+                return Some((idx, 2));
+            }
+            return Some((idx, 1));
+        }
+    }
+    None
+}
+
+fn drain_pending_lines(pending: &mut Vec<u8>) -> Vec<Vec<u8>> {
+    let mut lines: Vec<Vec<u8>> = Vec::new();
+    loop {
+        let Some((pos, consume)) = find_line_ending(pending.as_slice()) else {
+            break;
+        };
+        let line_bytes = pending[..pos].to_vec();
+        pending.drain(..pos + consume);
+        lines.push(line_bytes);
+    }
+    lines
+}
+
+fn split_output_lines(bytes: &[u8]) -> Vec<Vec<u8>> {
+    let mut lines: Vec<Vec<u8>> = Vec::new();
+    let mut start = 0usize;
+    let mut i = 0usize;
+
+    while i < bytes.len() {
+        match bytes[i] {
+            b'\n' => {
+                lines.push(bytes[start..i].to_vec());
+                i += 1;
+                start = i;
+            }
+            b'\r' => {
+                lines.push(bytes[start..i].to_vec());
+                if i + 1 < bytes.len() && bytes[i + 1] == b'\n' {
+                    i += 2;
+                } else {
+                    i += 1;
+                }
+                start = i;
+            }
+            _ => i += 1,
+        }
+    }
+
+    if start < bytes.len() {
+        lines.push(bytes[start..].to_vec());
+    }
+
+    lines
+}
+
+fn decode_output_bytes(bytes: &[u8]) -> String {
+    #[cfg(target_os = "windows")]
+    {
+        if bytes.is_empty() {
+            return String::new();
+        }
+
+        let code_page = unsafe { GetOEMCP() };
+        let required = unsafe {
+            MultiByteToWideChar(code_page, MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0), bytes, None)
+        };
+        if required <= 0 {
+            return String::from_utf8_lossy(bytes).to_string();
+        }
+
+        let mut wide = vec![0u16; required as usize];
+        let written = unsafe {
+            MultiByteToWideChar(
+                code_page,
+                MULTI_BYTE_TO_WIDE_CHAR_FLAGS(0),
+                bytes,
+                Some(&mut wide),
+            )
+        };
+        if written <= 0 {
+            return String::from_utf8_lossy(bytes).to_string();
+        }
+
+        wide.truncate(written as usize);
+        return String::from_utf16_lossy(&wide);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        String::from_utf8_lossy(bytes).to_string()
     }
 }
