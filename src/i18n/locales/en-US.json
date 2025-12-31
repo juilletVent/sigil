@@ -16,7 +16,7 @@
     },
     "about": {
       "title": "Sigil",
-      "version": "Version 0.1.0",
+      "version": "Version 0.1.1",
       "aboutProgram": "About This Program",
       "description": "Sigil is a modern desktop application built on Tauri, designed to simplify the management and execution of command-line tools.",
       "techStack": "Tech Stack",
@@ -25,7 +25,7 @@
       "projectVersion": "Version:",
       "license": "License:",
       "projectNameValue": "Sigil",
-      "projectVersionValue": "0.1.0",
+      "projectVersionValue": "0.1.1",
       "licenseValue": "MIT"
     },
     "configEdit": {

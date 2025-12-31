@@ -36,7 +36,7 @@ export const AppConfig = {
   /** 应用名称 */
   APP_NAME: import.meta.env.VITE_APP_NAME || "sigil",
   /** 应用版本 */
-  APP_VERSION: import.meta.env.VITE_APP_VERSION || "0.1.0",
+  APP_VERSION: import.meta.env.VITE_APP_VERSION || "0.1.1",
   /** API超时时间（毫秒） */
   API_TIMEOUT: Number(import.meta.env.VITE_API_TIMEOUT) || 30000,
   /** 是否启用调试模式 */

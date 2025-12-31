@@ -10,7 +10,7 @@ export const APP_NAME = "sigil";
 /**
  * 应用版本
  */
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
 
 /**
  * 数据库文件名
