@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router";
 import styled from "styled-components";
 import { message, Modal } from "antd";
@@ -39,6 +39,15 @@ function Home() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [commands, setCommands] = useState<CommandItem[]>([]);
+  const pendingStartRef = useRef<Map<number, { timerId: number }>>(new Map());
+
+  const clearPendingStart = (commandId: number) => {
+    const pending = pendingStartRef.current.get(commandId);
+    if (pending) {
+      window.clearTimeout(pending.timerId);
+      pendingStartRef.current.delete(commandId);
+    }
+  };
 
   // 加载命令列表
   useEffect(() => {
@@ -49,6 +58,18 @@ function Home() {
     const unlisten = listen<CommandState>("command-status-changed", (event) => {
       const state = event.payload;
       updateCommandStatus(state.command_id, state.status);
+
+      if (state.status === "failed") {
+        clearPendingStart(state.command_id);
+        const exitCodeText =
+          typeof state.exit_code === "number" ? ` (退出码: ${state.exit_code})` : "";
+        message.error(`${t("components.commandItem.executeFailed")}${exitCodeText}`);
+        return;
+      }
+
+      if (state.status === "success" || state.status === "stopped") {
+        clearPendingStart(state.command_id);
+      }
     });
 
     return () => {
@@ -146,17 +167,30 @@ function Home() {
     try {
       if (command.isRunning) {
         // 停止命令 - 同步更新，等待后端确认
+        clearPendingStart(commandId);
         await commandExecutionApi.stop(commandId);
         message.info(t("components.commandItem.stopSuccess") || "命令已停止");
         // UI 会通过 command-status-changed 事件自动更新
       } else {
         // 执行命令
+        clearPendingStart(commandId);
         await commandExecutionApi.execute(commandId);
-        message.success(t("components.commandItem.executeSuccess") || "命令已启动");
+        const timerId = window.setTimeout(async () => {
+          try {
+            const state = await commandExecutionApi.getState(commandId);
+            if (!state || state.status === "running") {
+              message.success(t("components.commandItem.executeSuccess") || "命令已启动");
+            }
+          } finally {
+            pendingStartRef.current.delete(commandId);
+          }
+        }, 1000);
+        pendingStartRef.current.set(commandId, { timerId });
         // UI 会通过 command-status-changed 事件自动更新
       }
     } catch (error) {
       console.error("命令操作失败:", error);
+      clearPendingStart(commandId);
       message.error(
         command.isRunning
           ? t("components.commandItem.stopFailed") || "停止命令失败"
