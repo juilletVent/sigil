@@ -94,7 +94,7 @@ fn is_elevated() -> bool {
     let output = std::process::Command::new("net")
         .args(&["session"])
         .output();
-    
+
     match output {
         Ok(result) => {
             // net session 在非管理员权限下会返回非零退出码
@@ -181,7 +181,9 @@ impl CommandRunner {
         states.insert(command_id, state.clone());
 
         // 发送状态变化事件到前端（广播到所有窗口）
-        let _ = self.app_handle.emit_to(EventTarget::Any, "command-status-changed", state);
+        let _ = self
+            .app_handle
+            .emit_to(EventTarget::Any, "command-status-changed", state);
     }
 
     /// 执行命令
@@ -200,49 +202,67 @@ impl CommandRunner {
         // Windows UAC 提升需要使用临时批处理文件来捕获输出
         // 但如果当前进程已有管理员权限，则不需要临时文件
         #[cfg(target_os = "windows")]
-        let (temp_batch_file, temp_output_file, temp_error_file, temp_exit_file) = if params.sudo && !is_elevated() {
-            // 创建临时文件用于 UAC 提升执行
-            let temp_dir = std::env::temp_dir();
-            let file_prefix = format!("sigil_cmd_{}", params.command_id);
-            
-            let batch_file = temp_dir.join(format!("{}.bat", file_prefix));
-            let output_file = temp_dir.join(format!("{}_stdout.txt", file_prefix));
-            let error_file = temp_dir.join(format!("{}_stderr.txt", file_prefix));
-            let exit_file = temp_dir.join(format!("{}_exit.txt", file_prefix));
-            
-            // 创建批处理文件，将命令输出重定向到临时文件
-            let working_dir = params.working_directory.as_ref()
-                .map(|wd| wd.replace('"', "\""))
-                .unwrap_or_else(|| "%CD%".to_string());
-            
-            let batch_content = format!(
-                "@echo off\n\
+        let (temp_batch_file, temp_output_file, temp_error_file, temp_exit_file) =
+            if params.sudo && !is_elevated() {
+                // 创建临时文件用于 UAC 提升执行
+                let temp_dir = std::env::temp_dir();
+                let file_prefix = format!("sigil_cmd_{}", params.command_id);
+
+                let batch_file = temp_dir.join(format!("{}.bat", file_prefix));
+                let output_file = temp_dir.join(format!("{}_stdout.txt", file_prefix));
+                let error_file = temp_dir.join(format!("{}_stderr.txt", file_prefix));
+                let exit_file = temp_dir.join(format!("{}_exit.txt", file_prefix));
+
+                // 创建批处理文件，将命令输出重定向到临时文件
+                let working_dir = if let Some(wd) = &params.working_directory {
+                    wd.replace('"', "\"")
+                } else {
+                    // 如果没有指定工作目录，使用当前工作目录
+                    match std::env::current_dir() {
+                        Ok(current_dir) => {
+                            let dir_str = current_dir.to_string_lossy().replace('"', "\"");
+                            log::debug!("批处理文件使用当前工作目录: {}", dir_str);
+                            dir_str
+                        }
+                        Err(e) => {
+                            log::warn!("无法获取当前工作目录: {}, 使用 %CD%", e);
+                            "%CD%".to_string()
+                        }
+                    }
+                };
+
+                let batch_content = format!(
+                    "@echo off\n\
                 cd /d \"{}\"\n\
                 ({}) > \"{}\" 2> \"{}\"\n\
                 echo %ERRORLEVEL% > \"{}\"",
-                working_dir,
-                params.command.replace('"', "\""),
-                output_file.to_string_lossy().replace('"', "\""),
-                error_file.to_string_lossy().replace('"', "\""),
-                exit_file.to_string_lossy().replace('"', "\"")
-            );
-            
-            std::fs::write(&batch_file, batch_content)
-                .map_err(|e| {
+                    working_dir,
+                    params.command.replace('"', "\""),
+                    output_file.to_string_lossy().replace('"', "\""),
+                    error_file.to_string_lossy().replace('"', "\""),
+                    exit_file.to_string_lossy().replace('"', "\"")
+                );
+
+                std::fs::write(&batch_file, batch_content).map_err(|e| {
                     log::error!("创建临时批处理文件失败: {}, 路径: {:?}", e, batch_file);
                     format!("创建临时批处理文件失败: {}", e)
                 })?;
-            
-            (Some(batch_file), Some(output_file), Some(error_file), Some(exit_file))
-        } else {
-            (None, None, None, None)
-        };
-        
+
+                (
+                    Some(batch_file),
+                    Some(output_file),
+                    Some(error_file),
+                    Some(exit_file),
+                )
+            } else {
+                (None, None, None, None)
+            };
+
         let mut cmd = if cfg!(target_os = "windows") {
             if params.sudo {
                 // 检测当前进程是否已有管理员权限
                 let is_elevated = is_elevated();
-                
+
                 if is_elevated {
                     // 如果已有管理员权限，直接执行命令（不需要 UAC 提升和临时文件）
                     let mut c = Command::new("cmd");
@@ -256,7 +276,7 @@ impl CommandRunner {
                     // 没有管理员权限，需要使用 UAC 提升
                     // 使用 PowerShell 的 -WindowStyle Hidden 来隐藏窗口
                     let batch_file = temp_batch_file.as_ref().unwrap();
-                    
+
                     // 获取完整路径（避免短路径问题）
                     let batch_file_path = match batch_file.canonicalize() {
                         Ok(path) => path,
@@ -265,16 +285,16 @@ impl CommandRunner {
                             batch_file.clone()
                         }
                     };
-                    
+
                     let batch_file_str = batch_file_path.to_string_lossy();
-                    
+
                     let mut c = Command::new("powershell");
                     // 使用 -WindowStyle Hidden 来隐藏 PowerShell 窗口
                     let ps_command = format!(
                         "Start-Process -FilePath \"{}\" -Verb RunAs -Wait -WindowStyle Hidden",
                         batch_file_str.replace("\"", "\"\"")
                     );
-                    
+
                     c.args([
                         "-NoProfile",
                         "-NonInteractive",
@@ -321,21 +341,45 @@ impl CommandRunner {
         let should_set_working_dir = !(params.sudo && !is_elevated());
         #[cfg(not(target_os = "windows"))]
         let should_set_working_dir = true;
-        
+
         if should_set_working_dir {
-            if let Some(wd) = &params.working_directory {
+            // 获取工作目录：如果指定了工作目录则使用指定的，否则使用当前工作目录
+            let working_dir;
+
+            if !params.working_directory.is_none()
+                && !params.working_directory.as_ref().unwrap().is_empty()
+            {
+                let wd = params.working_directory.as_ref().unwrap();
+
                 // 规范化路径，处理 Windows 反斜线和相对路径
                 let path = PathBuf::from(wd);
 
                 // 验证路径是否存在
                 if !path.exists() {
-                    return Err(format!("工作目录不存在: {}", wd));
+                    return Err(format!("工作目录不存在1: {:?}", wd));
                 }
 
                 if !path.is_dir() {
                     return Err(format!("工作目录路径不是目录: {}", wd));
                 }
 
+                working_dir = Some(path)
+            } else {
+                // 如果没有指定工作目录，使用当前工作目录
+                match std::env::current_dir() {
+                    Ok(current_dir) => {
+                        log::debug!("使用当前工作目录: {:?}", current_dir);
+                        working_dir = Some(current_dir)
+                    }
+                    Err(e) => {
+                        log::warn!("无法获取当前工作目录: {}, 将不设置工作目录", e);
+                        working_dir = None
+                    }
+                }
+            }
+
+            // 设置工作目录
+            if let Some(path) = working_dir {
                 cmd.current_dir(&path);
             }
         } else {
@@ -343,7 +387,7 @@ impl CommandRunner {
             if let Some(wd) = &params.working_directory {
                 let path = PathBuf::from(wd);
                 if !path.exists() {
-                    return Err(format!("工作目录不存在: {}", wd));
+                    return Err(format!("工作目录不存在2: {}", wd));
                 }
                 if !path.is_dir() {
                     return Err(format!("工作目录路径不是目录: {}", wd));
@@ -357,7 +401,7 @@ impl CommandRunner {
         let is_using_temp_files = params.sudo && !is_elevated();
         #[cfg(not(target_os = "windows"))]
         let is_using_temp_files = false;
-        
+
         if !is_using_temp_files {
             cmd.stdout(Stdio::piped())
                 .stderr(Stdio::piped())
@@ -414,14 +458,15 @@ impl CommandRunner {
                 }
 
                 // 打开进程句柄
-                let process_handle = match OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid) {
-                    Ok(handle) => handle,
-                    Err(e) => {
-                        let _ = CloseHandle(job);
-                        let _ = child.kill();
-                        return Err(format!("打开进程句柄失败: {:?}", e));
-                    }
-                };
+                let process_handle =
+                    match OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid) {
+                        Ok(handle) => handle,
+                        Err(e) => {
+                            let _ = CloseHandle(job);
+                            let _ = child.kill();
+                            return Err(format!("打开进程句柄失败: {:?}", e));
+                        }
+                    };
 
                 // 将进程添加到 Job
                 let assign_result = AssignProcessToJobObject(job, process_handle);
@@ -451,23 +496,31 @@ impl CommandRunner {
                     temp_batch_file.as_ref().and_then(|bf| {
                         temp_output_file.as_ref().and_then(|of| {
                             temp_error_file.as_ref().and_then(|ef| {
-                                temp_exit_file.as_ref().map(|xf| {
-                                    (bf.clone(), of.clone(), ef.clone(), xf.clone())
-                                })
+                                temp_exit_file
+                                    .as_ref()
+                                    .map(|xf| (bf.clone(), of.clone(), ef.clone(), xf.clone()))
                             })
                         })
                     })
                 } else {
                     None
                 };
-                infos.insert(params.command_id, CommandInfo {
-                    params: params.clone(),
-                    temp_files,
-                });
+                infos.insert(
+                    params.command_id,
+                    CommandInfo {
+                        params: params.clone(),
+                        temp_files,
+                    },
+                );
             }
             #[cfg(not(target_os = "windows"))]
             {
-                infos.insert(params.command_id, CommandInfo { params: params.clone() });
+                infos.insert(
+                    params.command_id,
+                    CommandInfo {
+                        params: params.clone(),
+                    },
+                );
             }
         }
 
@@ -483,7 +536,7 @@ impl CommandRunner {
         let is_using_temp_files = params.sudo;
         #[cfg(not(target_os = "windows"))]
         let is_using_temp_files = false;
-        
+
         if !is_using_temp_files {
             if let Some(stdout) = stdout {
                 let command_id = params.command_id;
@@ -521,7 +574,11 @@ impl CommandRunner {
                     for line in reader.lines() {
                         if let Ok(line) = line {
                             if !line.trim().is_empty() {
-                                runner.append_log(command_id, format!("[PowerShell] {}", line), "stderr");
+                                runner.append_log(
+                                    command_id,
+                                    format!("[PowerShell] {}", line),
+                                    "stderr",
+                                );
                             }
                         }
                     }
@@ -555,7 +612,9 @@ impl CommandRunner {
         #[cfg(target_os = "windows")]
         let temp_files = {
             let infos = self.command_infos.lock().unwrap();
-            infos.get(&command_id).and_then(|info| info.temp_files.clone())
+            infos
+                .get(&command_id)
+                .and_then(|info| info.temp_files.clone())
         };
 
         // 清理命令信息
@@ -662,17 +721,17 @@ impl CommandRunner {
         if let Some(ref info) = command_info {
             if let Some(ref temp_files) = info.temp_files {
                 let (_, output_file, error_file, _exit_file) = temp_files;
-                
+
                 // 等待一下，确保文件写入完成
                 std::thread::sleep(std::time::Duration::from_millis(100));
-                
+
                 // 读取 stdout
                 if let Ok(content) = std::fs::read_to_string(output_file) {
                     for line in content.lines() {
                         self.append_log(command_id, line.to_string(), "stdout");
                     }
                 }
-                
+
                 // 读取 stderr
                 if let Ok(content) = std::fs::read_to_string(error_file) {
                     for line in content.lines() {
@@ -692,7 +751,7 @@ impl CommandRunner {
         let (final_status, exit_code) = match exit_status {
             Ok(status) => {
                 let exit_code = status.code();
-                
+
                 // Windows UAC 提升：从临时文件读取退出码
                 #[cfg(target_os = "windows")]
                 let exit_code = if let Some(ref info) = command_info {
@@ -709,13 +768,13 @@ impl CommandRunner {
                 } else {
                     exit_code
                 };
-                
+
                 let final_status = if status.success() || exit_code == Some(0) {
                     CommandStatus::Success
                 } else {
                     CommandStatus::Failed
                 };
-                
+
                 (final_status, exit_code)
             }
             Err(e) => {
@@ -753,7 +812,12 @@ impl CommandRunner {
     }
 
     /// 发送通知
-    fn send_notification(&self, command_name: &str, status: &CommandStatus, exit_code: Option<i32>) {
+    fn send_notification(
+        &self,
+        command_name: &str,
+        status: &CommandStatus,
+        exit_code: Option<i32>,
+    ) {
         use tauri_plugin_notification::NotificationExt;
 
         let (title, body) = match status {
@@ -773,7 +837,8 @@ impl CommandRunner {
         };
 
         // 发送通知（忽略错误，避免通知失败影响主流程）
-        let _ = self.app_handle
+        let _ = self
+            .app_handle
             .notification()
             .builder()
             .title(title)
@@ -811,7 +876,9 @@ impl CommandRunner {
             line,
             stream: stream.to_string(),
         };
-        let _ = self.app_handle.emit_to(EventTarget::Any, "command-log-update", log_line);
+        let _ = self
+            .app_handle
+            .emit_to(EventTarget::Any, "command-log-update", log_line);
     }
 
     /// 获取命令日志
@@ -832,6 +899,8 @@ impl CommandRunner {
     #[allow(dead_code)]
     pub fn has_logs(&self, command_id: i64) -> bool {
         let logs = self.logs.lock().unwrap();
-        logs.get(&command_id).map(|v| !v.is_empty()).unwrap_or(false)
+        logs.get(&command_id)
+            .map(|v| !v.is_empty())
+            .unwrap_or(false)
     }
 }
